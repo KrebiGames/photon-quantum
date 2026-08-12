@@ -4,6 +4,16 @@
         <name>Quantum.Unity</name>
     </assembly>
     <members>
+        <member name="T:Quantum.QuantumUnityEditorPaths">
+            <summary>
+            Quantum Unity paths.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumUnityEditorPaths.Root">
+            <summary>
+            Root folder of Quantum installation.
+            </summary>
+        </member>
         <member name="T:Quantum.QuantumMonoBehaviour">
             <summary>
             Base class for all Quantum MonoBehaviours.
@@ -11,6 +21,11 @@
         </member>
         <member name="T:Quantum.QuantumStaticCollider3DSource">
             <summary/>
+        </member>
+        <member name="F:Quantum.QuantumStaticCollider3DSource.Settings">
+            <summary>
+            Additional static collider settings.
+            </summary>
         </member>
         <member name="T:Quantum.QuantumStaticCollider3DBakeContext">
             <summary/>
@@ -62,13 +77,13 @@
         </member>
         <member name="F:Quantum.QuantumMapData.StaticCollider2DReferences">
             <summary>
-            One-to-one mapping of Quantum 2D static collider entries in QAssetMap to their original source scripts. 
+            One-to-one mapping of Quantum 2D static collider entries in QAssetMap to their original source scripts.
             Purely for convenience to do post bake mappings and not required by the Quantum simulation.
             </summary>
         </member>
         <member name="F:Quantum.QuantumMapData.StaticCollider3DReferences">
             <summary>
-            One-to-one mapping of Quantum 3D static collider entries in QAssetMap to their original source scripts. 
+            One-to-one mapping of Quantum 3D static collider entries in QAssetMap to their original source scripts.
             Purely for convenience to do post bake mappings and not required by the Quantum simulation.
             </summary>
         </member>
@@ -994,6 +1009,60 @@
         <member name="M:Quantum.Profiling.QuantumGraphProfilerVerifiedFrames.OnUpdate">
             <inheritdoc/>
         </member>
+        <member name="T:Quantum.IQuantumNavMeshSource">
+            <summary>
+            Implement this in a MonoBehaviour to turn a script into a navmesh bake data source.
+            </summary>
+        </member>
+        <member name="T:Quantum.QuantumCreateMapNestedAssetDelegate">
+            <summary/>
+        </member>
+        <member name="T:Quantum.QuantumNavMeshBakeContext">
+            <summary/>
+        </member>
+        <member name="F:Quantum.QuantumNavMeshBakeContext.Sources">
+            <summary>
+            One-to-one mapping of <see cref="P:Quantum.QuantumNavMeshBakeContext.BakeData"/> entries to the source that added them.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumRagdoll._autoBakeMode">
+            <summary>
+            How frequently the ragdoll is updated
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumRagdoll._partsToUpdate">
+            <summary>
+            The filter for parts that will be updated or ignored during baking.
+            </summary>
+        </member>
+        <member name="T:Quantum.QuantumRagdoll.RagdollLimbUpdate">
+            <summary>
+            Stores the information of the limb hierarchy and the target position and rotation after the simulation.
+            These values will be applied to the transform in the LateUpdate.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumRagdoll.RagdollLimbUpdate.CompareTo(Quantum.QuantumRagdoll.RagdollLimbUpdate)">
+            <summary>
+            
+            </summary>
+            <param name="other"></param>
+            <returns></returns>
+        </member>
+        <member name="F:Quantum.QuantumRagdoll.BakeMode.Immediate">
+            <summary>
+            Apply the ragdoll settings every frame in Unity Edit Mode.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumRagdoll.BakeMode.OnValidate">
+            <summary>
+            Update the ragdoll only when some field in this component is updated.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumRagdoll.BakeMode.Disabled">
+            <summary>
+            Disable the ragdoll update.
+            </summary>
+        </member>
         <member name="T:Quantum.QuantumLoadBalancingClient">
             <summary>
             Obsolete: Not used anymore. Replace by using RealtimeClient directly.
@@ -1026,6 +1095,15 @@
             <summary>
             Invalidates the navmesh gizmos.
             </summary>
+        </member>
+        <member name="M:Quantum.QuantumGameGizmos.InvalidateStaticMeshGizmo(Quantum.TerrainCollider)">
+            <summary>
+            Invalidates the cached gizmo data for any static terrain collider backed by the given asset, so
+            that it is recomputed from the current heightmap on the next scene view repaint. Use this when a
+            terrain collider asset has been (re)baked outside of a full map bake (e.g. a .qterrain reimport).
+            </summary>
+            <param name="asset">The terrain collider asset that was (re)baked.</param>
+            <returns><see langword="true"/> if at least one cached entry was invalidated; otherwise <see langword="false"/>.</returns>
         </member>
         <member name="M:Quantum.QuantumGameGizmos.OnBeforeBake(Quantum.QuantumMapData)">
             <summary>
@@ -1242,11 +1320,6 @@
             The optional 2D pseudo height of the collider.
             </summary>
         </member>
-        <member name="F:Quantum.QuantumStaticPolygonCollider2D.Settings">
-            <summary>
-            Additional static collider settings.
-            </summary>
-        </member>
         <member name="P:Quantum.QuantumStaticPolygonCollider2D.UpdateVerticesFromSourceOnBake">
             <summary>
             Should the <see cref="F:Quantum.QuantumStaticPolygonCollider2D.Vertices"/> be set from the source collider during baking.
@@ -1411,6 +1484,36 @@
         <member name="M:Quantum.QuantumStaticInitializer.Initialize">
             <summary>
             Initializes the logging system for Quantum. This method is called automatically when the assembly is loaded.
+            </summary>
+        </member>
+        <member name="T:Quantum.QuantumStaticColliderSettings">
+            <summary>
+            Authoring settings shared by all static collider source components, baked into the map's static collider data.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumStaticColliderSettings.Trigger">
+            <summary>
+            If enabled, static collider reports overlaps but generates no physical collision response.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumStaticColliderSettings.MutableMode">
+            <summary>
+            Controls whether the baked static collider can be toggled on/off at runtime, and its initial enabled state.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumStaticColliderSettings.PhysicsMaterial">
+            <summary>
+            The physics material asset defining the collider's friction and restitution. If unassigned, the default physics material is used.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumStaticColliderSettings.UserAsset">
+            <summary>
+            Optional user asset linked to the baked static collider, retrievable at runtime via the collider's static data. Unassigned by default.
+            </summary>
+        </member>
+        <member name="P:Quantum.QuantumStaticColliderSettings.Asset">
+            <summary>
+            Obsolete alias for <see cref="F:Quantum.QuantumStaticColliderSettings.UserAsset"/>.
             </summary>
         </member>
         <member name="T:Quantum.QuantumRunnerLocalSavegame">
@@ -2451,11 +2554,6 @@
         <member name="F:Quantum.QuantumStaticTerrainCollider3D.BakeResolutionDivisor">
             <inheritdoc cref="T:Quantum.TerrainBakeResolutionDivisor"/>
         </member>
-        <member name="F:Quantum.QuantumStaticTerrainCollider3D.Settings">
-            <summary>
-            Additional static collider settings.
-            </summary>
-        </member>
         <member name="F:Quantum.QuantumStaticTerrainCollider3D.SmoothSphereMeshCollisions">
             <summary>
             The physics solver will resolve sphere and capsule shapes against terrain collisions as if it was a regular flat and smooth plane.
@@ -2621,11 +2719,6 @@
         <member name="F:Quantum.QuantumStaticMeshCollider3D.Mesh">
             <summary>
             The Unity mesh to convert into a Quantum static mesh colliders.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumStaticMeshCollider3D.Settings">
-            <summary>
-            Additional static collider settings.
             </summary>
         </member>
         <member name="F:Quantum.QuantumStaticMeshCollider3D.SmoothSphereMeshCollisions">
@@ -4104,11 +4197,6 @@
             The optional 2D pseudo height of the collider.
             </summary>
         </member>
-        <member name="F:Quantum.QuantumStaticCapsuleCollider2D.Settings">
-            <summary>
-            Additional static collider settings.
-            </summary>
-        </member>
         <member name="M:Quantum.QuantumStaticCapsuleCollider2D.UpdateFromSourceCollider">
             <summary>
             Copy collider configuration from source collider if exist. 
@@ -4430,6 +4518,9 @@
             </summary>
             <param name="context"></param>
         </member>
+        <member name="T:Quantum.QuantumGetMapNestedAssetRefDelegate">
+            <summary/>
+        </member>
         <member name="T:Quantum.QuantumEntityPrototypeBakeContext">
             <summary/>
         </member>
@@ -4605,6 +4696,11 @@
             Returns the live Quantum Game.
             </summary>
         </member>
+        <member name="P:Quantum.QuantumInstantReplay.ReplayRunner">
+            <summary>
+            Returns the replay Quantum runner.
+            </summary>
+        </member>
         <member name="P:Quantum.QuantumInstantReplay.ReplayGame">
             <summary>
             Returns the replay Quantum Game or null.
@@ -4615,9 +4711,25 @@
             Returns the progress or normalized time [0..1] of the instant replay.
             </summary>
         </member>
+        <member name="M:Quantum.QuantumInstantReplay.#ctor">
+            <summary>
+            Default constructor.
+            </summary>
+        </member>
         <member name="M:Quantum.QuantumInstantReplay.#ctor(Quantum.QuantumGame,System.Single,Quantum.QuantumInstantReplaySeekMode,System.Boolean)">
             <summary>
             Create and start an instant replay.
+            </summary>
+            <param name="liveGame">The original game.</param>
+            <param name="length">The time in seconds to rewind the original game and start the instant replay from.</param>
+            <param name="seekMode">An optional seek mode to seek and rewind the running instant replay.</param>
+            <param name="loop">Automatically loop the instant replay and never stop.</param>
+            <exception cref="T:System.ArgumentNullException">Is raised when the live game is null.</exception>
+            <exception cref="T:System.ArgumentException">Is raised when no valid snapshot was found to start the replay from.</exception>
+        </member>
+        <member name="M:Quantum.QuantumInstantReplay.Run(Quantum.QuantumGame,System.Single,Quantum.QuantumInstantReplaySeekMode,System.Boolean)">
+            <summary>
+            Start an instant replay.
             </summary>
             <param name="liveGame">The original game.</param>
             <param name="length">The time in seconds to rewind the original game and start the instant replay from.</param>
@@ -4946,6 +5058,12 @@
             Types that failed to load. Used to limit attempts until a reimport happens. Also, there's a nasty bug
             at least in some Unity versions (verified on 2021), where if there's a type of the same name in multiple assemblies,
             AssetDatabase.GetMainAssetPath may return the wrong one.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumGlobalScriptableObject.ClearTypesFailedToLoad">
+            <summary>
+            Use to clear internal list marking specific type as unable to load. Types might be unable to load during bootstrap, so cleaning the list
+            in some static initializer is a good way to ensure things can recover.
             </summary>
         </member>
         <member name="T:Quantum.QuantumGlobalScriptableObjectAttribute">
@@ -5628,6 +5746,586 @@
         <member name="F:Quantum.QuantumEntityViewPool.PooledObject.GameObject">
             <summary>
             The prefab to instantiate pooled game objects from.
+            </summary>
+        </member>
+        <member name="T:Quantum.QuantumNavMesh">
+            <summary>
+            This class is a collection of utility methods to import Unity NavMesh data into Quantum NavMesh data.
+            </summary>
+            <summary>
+            This class is a collection of utility methods to import Unity NavMesh data into Quantum NavMesh data.
+            </summary>
+        </member>
+        <member name="T:Quantum.QuantumNavMesh.SeamRepair">
+            <summary>
+            Repairs hairline seams in the intermediate navmesh data with three escalating passes:
+            open (border) vertices that are nearly identical are welded into one, open edges are split at T-junction
+            vertices that lie on their interior and remaining seams between two facing open edges are zipped by
+            anchoring the ends of the hairline section: endpoint pairs across the gap are welded to their midpoint,
+            a corner vertex of one side is inserted into the other side's edge and where the section end has no
+            vertex at all (a vertex-free sliver) a new stitch vertex is created in the middle of the gap and inserted
+            into both edges.
+            The repair never moves geometry by more than the configured seam distance.
+            Runs on the intermediate import data because triangle connectivity (portals) is established by shared
+            vertex indices during baking, which also makes the repair immune to fixed point quantization.
+            </summary>
+        </member>
+        <member name="T:Quantum.QuantumNavMesh.SeamRepair.Settings">
+            <summary>
+            The seam repair and validation settings.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.SeamRepair.Settings.SeamDistance">
+            <summary>
+            Gaps between two opposing border edges narrower than this distance (in world units) are treated as seams:
+            the repair closes them by welding and splitting, the validation reports them. Default is 0.05.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.SeamRepair.Settings.MinSeamLength">
+            <summary>
+            A gap must stay narrower than <see cref="F:Quantum.QuantumNavMesh.SeamRepair.Settings.SeamDistance"/> for at least this length (in world units) to be treated as a seam.
+            This filters out genuine sharp corners of the navmesh boundary. Default is 0.25.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.SeamRepair.Settings.HeightEpsilon">
+            <summary>
+            Geometry that is further apart vertically than this distance (in world units) is treated as different floors and is neither repaired nor reported. Default is 0.05.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.SeamRepair.Settings.UnweldedVertexDistance">
+            <summary>
+            Two distinct border vertices closer to each other than this distance (in world units) are welded by the repair and reported as unwelded duplicates. Default is 0.01.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.Repair(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,Quantum.QuantumNavMesh.SeamRepair.Settings,System.Int32@,System.Int32@,System.Action{System.Single})">
+            <summary>
+            Repairs seams by alternating weld and split passes until the mesh is stable.
+            Uses <see cref="F:Quantum.QuantumNavMesh.SeamRepair.Settings.UnweldedVertexDistance"/> as the weld distance,
+            <see cref="F:Quantum.QuantumNavMesh.SeamRepair.Settings.SeamDistance"/> as the T-junction search distance and
+            <see cref="F:Quantum.QuantumNavMesh.SeamRepair.Settings.HeightEpsilon"/> to separate different floors.
+            Run <see cref="M:Quantum.QuantumNavMesh.ImportUtils.RemoveUnusedVertices(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Action{System.Single})"/> afterwards when vertices were welded.
+            </summary>
+            <param name="vertices">Mesh vertices collection.</param>
+            <param name="triangles">Mesh triangles collection, triangles are added when edges are split.</param>
+            <param name="settings">The seam thresholds, uses defaults when <see langword="null"/>.</param>
+            <param name="weldedVertices">The number of vertices that were welded onto another vertex.</param>
+            <param name="splitEdges">The number of open edges that were split at a T-junction vertex.</param>
+            <param name="reporter">Optional progress callback reporting values between 0 and 1.</param>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.FindOpenEdges(Quantum.NavMeshBakeDataTriangle[],System.Collections.Generic.HashSet{System.Int64})">
+            <summary>
+            Finds all edges that are used by exactly one triangle. Degenerated triangles are ignored,
+            they are removed later in the import pipeline.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.WeldOpenVertices(Quantum.QuantumNavMesh.Vertex[],Quantum.NavMeshBakeDataTriangle[],System.Collections.Generic.List{Quantum.QuantumNavMesh.SeamRepair.OpenEdge},System.Collections.Generic.HashSet{System.Int64},Quantum.QuantumNavMesh.SeamRepair.Settings)">
+            <summary>
+            Welds open vertices that are nearly identical but not connected by an edge, remapping the higher
+            vertex index onto the lower one like <see cref="M:Quantum.QuantumNavMesh.ImportUtils.WeldIdenticalVertices(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Single,System.Action{System.Single})"/>.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.SplitTJunctions(Quantum.QuantumNavMesh.Vertex[],Quantum.NavMeshBakeDataTriangle[]@,System.Collections.Generic.List{Quantum.QuantumNavMesh.SeamRepair.OpenEdge},Quantum.QuantumNavMesh.SeamRepair.Settings)">
+            <summary>
+            Splits open edges at open vertices that lie on their interior (T-junctions).
+            Every triangle is split at most once per pass, remaining junctions are handled by the next iteration.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.ZipSeamPairs(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Collections.Generic.List{Quantum.QuantumNavMesh.SeamRepair.OpenEdge},System.Collections.Generic.HashSet{System.Int64},Quantum.QuantumNavMesh.SeamRepair.Settings,System.Int32@,System.Int32@)">
+            <summary>
+            Detects pairs of facing open edges that run nearly coincident and closes the hairline section between them by
+            anchoring both of its ends, welding, inserting or creating stitch vertices as needed.
+            The middle section then shares both vertex indices on both sides and is no longer an open edge.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.TryGetSeamSection(Quantum.QuantumNavMesh.Vertex[],Quantum.QuantumNavMesh.SeamRepair.OpenEdge,Quantum.QuantumNavMesh.SeamRepair.OpenEdge,Quantum.QuantumNavMesh.SeamRepair.Settings,System.Double@,System.Double@)">
+            <summary>
+            Computes the parameter section on edge <paramref name="a"/> along which the gap towards the facing
+            edge <paramref name="b"/> stays below the seam distance, using the shared linear gap model.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.StitchSectionEnd(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,Quantum.QuantumNavMesh.SeamRepair.OpenEdge,Quantum.QuantumNavMesh.SeamRepair.OpenEdge,System.Double,System.Collections.Generic.HashSet{System.Int64},System.Collections.Generic.HashSet{System.Int32},System.Int32[],Quantum.QuantumNavMesh.SeamRepair.Settings,System.Int32@,System.Int32@)">
+            <summary>
+            Anchors one end of a hairline section so that both sides of the seam share a vertex index there:
+            welds two existing endpoints to their midpoint, inserts an existing corner vertex into the opposing
+            edge, or creates a new stitch vertex in the middle of the gap and inserts it into both edges.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.AddSplitEdges(System.Collections.Generic.HashSet{System.Int64},System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Registers the edges created by inserting vNew into edge (v0, v1) of a triangle with the
+            given apex vertex, so the weld guards see topology created earlier in the same pass.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.ResolveAnchor(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.SeamRepair.OpenEdge,Quantum.QuantumNavMesh.Vertex[],Quantum.QuantumNavMesh.SeamRepair.Settings)">
+            <summary>
+            Returns the edge endpoint vertex index when the point is close enough to snap to it, otherwise -1.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.TryGetSeamSection(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.SeamRepair.Settings,System.Double@,System.Double@)">
+            <summary>
+            Computes the parameter section [sLo, sHi] on segment (a0, a1) along which the gap towards the
+            facing segment (b0, b1) stays below the seam distance. The gap width changes linearly along the
+            projected overlap of the two segments. Returns false when the segments do not overlap, the
+            closest gap lies on a different floor or the section is shorter than the min seam length.
+            The facing criterion is tested by the callers (edge winding in the repair, border normals when
+            validating a baked navmesh).
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.BuildVertexGrid(System.Func{System.Int32,Quantum.QuantumNavMesh.Vector3Double},System.Collections.Generic.List{System.Int32},System.Double@)">
+            <summary>
+            Hashes the given vertex indices into a coarse 2D grid keyed by <see cref="M:Quantum.QuantumNavMesh.SeamRepair.CellKey(System.Int32,System.Int32)"/> so only
+            nearby vertices are tested against each other.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.RasterizeSegment(System.Collections.Generic.Dictionary{System.Int64,System.Collections.Generic.List{System.Int32}},Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,System.Double,System.Double,System.Int32)">
+            <summary>
+            Adds <paramref name="value"/> to every grid cell touched by the bounding box of the segment
+            (p0, p1) expanded by <paramref name="expand"/>.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.DistancePointSegmentXZ(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,System.Double@)">
+            <summary>
+            Returns the XZ plane distance between point <paramref name="p"/> and the closest point on the
+            segment (s0, s1), with the vertical distance at that point in <paramref name="heightDistance"/>.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.DistanceXZ(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
+            <summary>
+            Returns the distance between the two points in the XZ plane.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.Lerp(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,System.Double)">
+            <summary>
+            Linearly interpolates between the two points.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.PairKey(System.Int32,System.Int32)">
+            <summary>
+            Returns an order-independent key for the index pair.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.CellKey(System.Int32,System.Int32)">
+            <summary>
+            Returns the grid key for the cell coordinates.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.SeamRepair.CellIndex(System.Double,System.Double)">
+            <summary>
+            Returns the grid cell coordinate of the world coordinate.
+            </summary>
+        </member>
+        <member name="T:Quantum.QuantumNavMesh.ImportSettings">
+            <summary>
+            The Unity navmesh import settings.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.WeldIdenticalVertices">
+            <summary>
+            The Unity NavMesh is a collection of non - connected triangles, this option is very important and combines shared vertices.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.WeldVertexEpsilon">
+            <summary>
+            Don't make the epsilon too small, vertices to fuse are missed, also don't make the value too big as it will deform your navmesh. Min = float.Epsilon.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.DelaunayTriangulation">
+            <summary>
+            Post processes imported Unity navmesh with a Delaunay triangulation to reduce long triangles.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.DelaunayTriangulationRestrictToPlanes">
+            <summary>
+            In 3D the triangulation can deform the navmesh on slopes, check this option to restrict the triangulation to triangles that lie in the same plane.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.FixTrianglesOnEdges">
+            <summary>
+            Sometimes vertices are lying on other triangle edges, this will lead to unwanted borders being detected, this option splits those vertices.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.FixTrianglesOnEdgesEpsilon">
+            <summary>
+            Increase this value when borders inside the navmesh are generated.
+            Start by setting the epsilon to 0.0001 and never increase to more than 0.001.
+            Default is 1e-6f (0.000001f).
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.FixTrianglesOnEdgesHeightEpsilon">
+            <summary>
+            Make the height offset considerably larger than FixTrianglesOnEdgesEpsilon to better detect degenerate triangles. Is the navmesh becomes deformed chose a smaller epsilon. . Min = float.Epsilon. Default is 0.05.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.RepairSeams">
+            <summary>
+            Automatically closes hairline seams that cause false borders generated by welding nearly identical open vertices and by splitting open edges at T-junction vertices.
+            Uses <see cref="F:Quantum.QuantumNavMesh.SeamRepair.Settings.SeamDistance"/> as the T-junction search distance/>.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.SeamRepairSettings">
+            <summary>
+            The seam detection settings used by the repair.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.LinkErrorCorrection">
+            <summary>
+            Automatically correct navmesh link position to the closest triangle by searching this distance (default is 0).
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.ClosestTriangleCalculation">
+            <summary>
+            SpiralOut will be considerably faster but fallback triangles can be null.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.ClosestTriangleCalculationDepth">
+            <summary>
+            Number of cells to search triangles in neighbors.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.EnableQuantum_XY">
+            <summary>
+            Activate this and the navmesh baking will flip Y and Z to support navmeshes generated in the XY plane.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.MinAgentRadius">
+            <summary>
+            The agent radius that the navmesh is build for. The value is retrieved from Unity settings when baking in Editor.
+            </summary>
+        </member>
+        <member name="P:Quantum.QuantumNavMesh.ImportSettings.ImportRegions">
+            <summary>
+            Toggle the Quantum region import.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.ImportRegionMode">
+            <summary>
+            Toggle the region import mode. Default is Simple.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.ImportAutoGeneratedLinks">
+            <summary>
+            If Quantum should import Links that were auto generated by Unity.
+            Only works in Unity 2022 and above, since Unity did not generate links before that.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.RegionDetectionMargin">
+            <summary>
+            The artificial margin is necessary because the Unity NavMesh does not fit the source size very well. The value is added to the navmesh area and checked against all Quantum Region scripts to select the correct region id.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.ImportSettings.RegionAreaIds">
+            <summary>
+            The region area ids to import.
+            </summary>
+        </member>
+        <member name="T:Quantum.QuantumNavMesh.Vertex">
+            <summary>
+            Intermediate mesh vertex data structure.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.Vertex.Id">
+            <summary>
+            The vertex id.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.Vertex.Position">
+            <summary>
+            The world position.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vertex.Convert">
+            <summary>
+            Convert the vertex data to a Quantum NavMesh vertex.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.DefaultMinAgentRadius">
+            <summary>
+            The default minimum agent radius. Will be updated during importing the Unity navmesh.
+            </summary>
+        </member>
+        <member name="T:Quantum.QuantumNavMesh.ImportUtils">
+            <summary>
+            The navmesh import utility methods.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.ImportUtils.WeldIdenticalVertices(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Single,System.Action{System.Single})">
+            <summary>
+            Tries to merge vertices that are very close to each other into a single vertex.
+            </summary>
+            <param name="vertices">Mesh vertices collection.</param>
+            <param name="triangles">Mesh triangles collection.</param>
+            <param name="cleanupEpsilon">The epsilon to detect identical vertices.</param>
+            <param name="reporter">Progress bar.</param>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.ImportUtils.RemoveDegenerateTriangles(Quantum.NavMeshBakeDataTriangle[]@,System.Action{System.Single})">
+            <summary>
+            Identifies and removes degenerate triangles from the mesh triangles collection.
+            Will copy and recreated the triangles array when any degenerate triangles has been found.
+            The cleanup has to be performed before creating the links, otherwise the links will reference invalid triangles.
+            </summary>
+            <param name="triangles">Triangle array</param>
+            <param name="reporter">Progress reporter</param>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.ImportUtils.RemoveUnusedVertices(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Action{System.Single})">
+            <summary>
+            Removes unused vertices from the vertex array.
+            </summary>
+            <param name="vertices">Mesh vertices collection.</param>
+            <param name="triangles">Mesh triangles collection.</param>
+            <param name="reporter">Progress bar.</param>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.ImportUtils.ImportRegionsSimple(Quantum.NavMeshBakeDataTriangle[]@,System.Collections.Generic.List{System.String}@,System.Collections.Generic.Dictionary{System.Int32,System.String},System.Collections.Generic.List{System.Int32},System.Action{System.Single})">
+            <summary>
+            Use the Unity navmesh areas encoded into the Unity navmesh to generate Quantum regions.
+            </summary>
+            <param name="triangles">Imported Navmesh triangles</param>
+            <param name="regionMap">The global region map, will add new regions</param>
+            <param name="unityAreaMap">Map a Unity area id to a area name</param>
+            <param name="regionIncludeList">Include these region ids</param>
+            <param name="reporter">Progress bar</param>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.ImportUtils.ImportRegions(UnityEngine.SceneManagement.Scene,Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Int32,System.Collections.Generic.List{System.String}@,System.Single)">
+            <summary>
+            Tries to identify what region individual vertices belong to. Uses the original <see cref="T:Quantum.QuantumNavMeshRegion"/> scripts to cast vertices against.
+            </summary>
+            <param name="scene">Unity scene.</param>
+            <param name="vertices">Mesh vertices collection.</param>
+            <param name="triangles">Mesh triangles collection.</param>
+            <param name="t">The current triangle index to analyze.</param>
+            <param name="regionMap">The list of regions already found.</param>
+            <param name="regionDetectionMargin">The region detection margin used to enlarge the reference share from the <see cref="T:Quantum.QuantumNavMeshRegion"/> script.</param>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.ImportUtils.FixTrianglesOnEdges(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Int32,System.Int32,System.Single,System.Single)">
+            <summary>
+            Tries to detect degenerated triangles that are emit by the Unity navmesh triangulation. This detects when triangles have vertices on other triangle edges.
+            </summary>
+            <param name="vertices">Mesh vertices collection.</param>
+            <param name="triangles">Mesh triangles collection.</param>
+            <param name="t">The current triangle index to analyze.</param>
+            <param name="v0">The first vertex.</param>
+            <param name="epsilon">The epsilon to use when detecting vertex on edges.</param>
+            <param name="epsilonHeight">The explicit height epsilon to use.</param>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.ImportUtils.FindTriangleOnEdge(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Int32,System.Int32,System.Int32,System.Single,System.Single,System.Int32@)">
+            <summary>
+            Detects if a triangle <paramref name="tri"/> has a vertex on the segment between <paramref name="v0"/> and <paramref name="v1"/>.
+            </summary>
+            <returns>The triangle that lies on the segment or -1.</returns>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.ImportUtils.SplitTriangle(Quantum.NavMeshBakeDataTriangle[]@,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Splits a triangle into two triangles by inserting a new vertex at the edge between <paramref name="v0"/> and v0 + 1.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.CreateUnityNavmeshAreaMap">
+            <summary>
+            Create a dictionary that maps Unity NavMesh area ids to area names.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.ImportFromUnity(UnityEngine.SceneManagement.Scene,Quantum.QuantumNavMesh.ImportSettings,System.String,System.Collections.Generic.IEnumerable{UnityEngine.Object})">
+            <summary>
+            Import a Unity NavMesh into Quantum NavMesh data.
+            </summary>
+            <param name="scene">The Unity scene.</param>
+            <param name="settings">The navmesh import settings.</param>
+            <param name="name">The navmesh.</param>
+            <param name="existingData">The existing NavMeshData from Unity (optional)</param>
+            <returns>The resulting imported navmesh.</returns>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.FindSmallestAgentRadius(UnityEngine.GameObject[])">
+            <summary>
+            Iterates through all navmesh surfaces and detect the smallest agent radius used.
+            </summary>
+            <param name="navmeshSurfaces">List of navmesh surfaces to analyze.</param>
+            <returns>The smallets agent radius in FP.</returns>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.UnityNavMeshLinkData.#ctor(UnityEditor.SerializedProperty,System.Int32)">
+            <summary>
+            Construct from a serialized OffMeshLink element inside NavMeshData
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.UnityNavMeshLinkData.ExtractFrom(UnityEngine.AI.NavMeshData)">
+            <summary>
+            Extract all OffMeshLinks from a NavMeshData into UnityNavMeshLinkData[]
+            </summary>
+        </member>
+        <member name="T:Quantum.QuantumNavMesh.Vector2Double">
+            <summary>
+            Math class only used by <see cref="T:Quantum.QuantumNavMesh"/> import calculations. Uses double precision.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.Vector2Double.X">
+            <summary>
+            X component of the vector.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.Vector2Double.Y">
+            <summary>
+            Y component of the vector.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector2Double.#ctor(System.Double,System.Double)">
+            <summary>
+            Create new vector.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector2Double.op_Subtraction(Quantum.QuantumNavMesh.Vector2Double,Quantum.QuantumNavMesh.Vector2Double)">
+            <summary>
+            Minus operator.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector2Double.Distance(Quantum.QuantumNavMesh.Vector2Double,Quantum.QuantumNavMesh.Vector2Double)">
+            <summary>
+            Calculate the distance between two points.
+            </summary>
+            <param name="a">Point a.</param>
+            <param name="b">Point b.</param>
+            <returns>The distance between to points.</returns>
+        </member>
+        <member name="T:Quantum.QuantumNavMesh.Vector3Double">
+            <summary>
+            Math class only used by <see cref="T:Quantum.QuantumNavMesh"/> import calculations. Uses double precision.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.Vector3Double.X">
+            <summary>
+            X component of the vector.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.Vector3Double.Y">
+            <summary>
+            Y component of the vector.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumNavMesh.Vector3Double.Z">
+            <summary>
+            Z component of the vector.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.#ctor(System.Double,System.Double,System.Double)">
+            <summary>
+            Crate a new vector.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.#ctor(Photon.Deterministic.FPVector3)">
+            <summary>
+            Create a new vector using a Quantum fixed point vector.
+            </summary>
+            <param name="v"></param>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.#ctor(UnityEngine.Vector3)">
+            <summary>
+            Create a new vector using a Unity vector.
+            </summary>
+            <param name="v"></param>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Equals(System.Object)">
+            <summary>
+            Returns a value indicating whether this instance is equal to a specified Vector3Double value.
+            </summary>
+            <param name="obj">An Vector3Double value to compare to this instance.</param>
+            <returns><see langword="true"/> if other has the same value as this instance; otherwise, <see langword="false"/>.</returns>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.GetHashCode">
+            <summary>
+            Overrides the default hash function.
+            </summary>
+            <returns>A hash code for the current object.</returns>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Equality(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
+            <summary>
+            Operator override for which checks if two instances of Vector3Double are equal.
+            </summary>
+            <returns><see langword="true"/> if the instances are equal.</returns>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Inequality(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
+            <summary>
+            Operator override for which checks if two instances of REPLACE are not equal.
+            </summary>
+            <returns><see langword="true"/> if the instances are not equal.</returns>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Subtraction(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
+            <summary>
+            Subtracts two Vector3Double instances.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Addition(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
+            <summary>
+            Adds two Vector3Double instances.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Multiply(Quantum.QuantumNavMesh.Vector3Double,System.Double)">
+            <summary>
+            Multiplies a Vector3Double instance with a scalar.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Multiply(System.Double,Quantum.QuantumNavMesh.Vector3Double)">
+            <summary>
+            Multiplies a Vector3Double instance with a scalar.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.AsFPVector">
+            <summary>
+            Converts into fixed point vector. Only safe during editor as it uses <see cref="M:Photon.Deterministic.FP.FromFloat_UNSAFE(System.Single)"/>.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.AsVector">
+            <summary>
+            Converts into Unity vector.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.SqrMagnitude">
+            <summary>
+            Returns the square magnitude of the vector.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.SqrMagnitude(Quantum.QuantumNavMesh.Vector3Double)">
+            <summary>
+            Returns the square magnitude <paramref name="v"/>
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Magnitude">
+            <summary>
+            Returns the magnitude of the vector.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Distance(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
+            <summary>
+            Returns the distance between two points.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Normalize">
+            <summary>
+            Normalized the vector.
+            </summary>
+            <exception cref="T:System.ArgumentException">Is raised when the magnitude is 0.</exception>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.ToString">
+            <summary>
+            Converts the numeric value of this instance to its equivalent string representation.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Dot(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
+            <summary>
+            Returns the dot product of two vectors.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Cross(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
+            <summary>
+            Returns the cross product of two vectors.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.IsPointBetween(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,System.Single,System.Single)">
+            <summary>
+            Calculates if the point <paramref name="p"/> is between the two points <paramref name="v0"/> and <paramref name="v1"/>.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumNavMesh.Vector3Double.ClosestDistanceToTriangle(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double@)">
+            <summary>
+            Calculates the closest distance from point <paramref name="p"/> to the triangle defined by <paramref name="v0"/>, <paramref name="v1"/> and <paramref name="v2"/>.
             </summary>
         </member>
         <member name="T:Quantum.GizmoUtils">
@@ -6540,11 +7238,6 @@
             The rotation offset added to the <see cref="P:UnityEngine.Transform.rotation"/> during baking.
             </summary>
         </member>
-        <member name="F:Quantum.QuantumStaticBoxCollider3D.Settings">
-            <summary>
-            Additional static collider settings.
-            </summary>
-        </member>
         <member name="M:Quantum.QuantumStaticBoxCollider3D.UpdateFromSourceCollider">
             <summary>
             Copy collider configuration from source collider if exist. 
@@ -6594,11 +7287,6 @@
         <member name="F:Quantum.QuantumStaticEdgeCollider2D.Height">
             <summary>
             The optional 2D pseudo height of the collider.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumStaticEdgeCollider2D.Settings">
-            <summary>
-            Additional static collider settings.
             </summary>
         </member>
         <member name="M:Quantum.QuantumStaticEdgeCollider2D.UpdateFromSourceCollider">
@@ -6777,16 +7465,6 @@
             Registers a custom dependency with the given name and hash.
             </summary>
         </member>
-        <member name="T:Quantum.QuantumUnityEditorPaths">
-            <summary>
-            Quantum Unity paths.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumUnityEditorPaths.Root">
-            <summary>
-            Root folder of Quantum installation.
-            </summary>
-        </member>
         <member name="T:Quantum.QuantumUnityExtensions">
             <summary>
             Provides backwards compatibility for Unity API.
@@ -6845,6 +7523,16 @@
             </summary>
             <param name="scene"></param>
             <returns></returns>
+        </member>
+        <member name="M:Quantum.QuantumUnitySceneManagerUtils.GetRawHandle(UnityEngine.SceneManagement.Scene)">
+            <summary>
+            Gets the raw handle of a <paramref name="scene"/>
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumUnitySceneManagerUtils.CompareRawHandle(UnityEngine.SceneManagement.Scene,System.Int32)">
+            <summary>
+            Compares the object id to the internal handle of <paramref name="scene"/>
+            </summary>
         </member>
         <member name="M:Quantum.QuantumUnitySceneManagerUtils.Dump(UnityEngine.SceneManagement.Scene)">
             <summary>
@@ -6905,6 +7593,11 @@
         </member>
         <member name="T:Quantum.QuantumStaticCollider2DSource">
             <summary/>
+        </member>
+        <member name="F:Quantum.QuantumStaticCollider2DSource.Settings">
+            <summary>
+            Additional static collider settings.
+            </summary>
         </member>
         <member name="T:Quantum.QuantumStaticCollider2DBakeContext">
             <summary/>
@@ -7007,6 +7700,11 @@
         <member name="T:Quantum.QuantumMeshCollection">
             <summary>
             A collection of Unity mesh asset to draw gizmos or scene object. 
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumMeshCollection.DefaultPath">
+            <summary>
+            The default location of the global QuantumDeterministicSessionConfigAsset asset.
             </summary>
         </member>
         <member name="F:Quantum.QuantumMeshCollection.Capsule">
@@ -7498,11 +8196,6 @@
             The rotation offset added to the <see cref="P:UnityEngine.Transform.rotation"/> during baking.
             </summary>
         </member>
-        <member name="F:Quantum.QuantumStaticCapsuleCollider3D.Settings">
-            <summary>
-            Additional static collider settings.
-            </summary>
-        </member>
         <member name="M:Quantum.QuantumStaticCapsuleCollider3D.UpdateFromSourceCollider">
             <summary>
             Copy collider configuration from source collider if exist. 
@@ -7634,11 +8327,6 @@
             Set an optional pseudo height of the collider.
             </summary>
         </member>
-        <member name="F:Quantum.QuantumStaticBoxCollider2D.Settings">
-            <summary>
-            Additional static collider settings.
-            </summary>
-        </member>
         <member name="M:Quantum.QuantumStaticBoxCollider2D.UpdateFromSourceCollider">
             <summary>
             Copy collider configuration from source collider if exist. 
@@ -7656,6 +8344,35 @@
         </member>
         <member name="M:Quantum.QuantumStaticBoxCollider2D.GetColliders(Quantum.QuantumStaticCollider2DBakeContext)">
             <inheritdoc cref="M:Quantum.QuantumStaticCollider2DSource.GetColliders(Quantum.QuantumStaticCollider2DBakeContext)"/>
+        </member>
+        <member name="T:Quantum.QuantumRagdollLimbView">
+            <summary>
+            A custom entity view for the parts of the ragdoll. Since ragdoll limbs can have parents in Unity's hierarchy, they must be updated in the correct order.
+            Otherwise, the updating of a parent transform position right after its child position will mess with the limb position.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumRagdollLimbView._depth">
+            <summary>
+            The depth of the body's limb or part based on its unity's transform hierarchy. 
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumRagdollLimbView._ragdollView">
+            <summary>
+            A reference to the Unity's ragdoll editor. It will update 
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumRagdollLimbView.SetRoot(Quantum.QuantumRagdoll,System.Int32)">
+            <summary>
+            Setup the root of the ragdoll system as a <see cref="T:Quantum.QuantumRagdoll"/> and set the level of depth of this limb.
+            </summary>
+            <param name="ragdoll"></param>
+            <param name="depth"></param>
+        </member>
+        <member name="M:Quantum.QuantumRagdollLimbView.ApplyTransform(Quantum.QuantumEntityView.UpdatePositionParameter@)">
+            <summary>
+            This method delegates the application of the final position and rotation interpolation to the <see cref="T:Quantum.QuantumRagdoll"/> LateUpdate.
+            </summary>
+            <param name="param"></param>
         </member>
         <member name="T:Quantum.QuantumAddRuntimePlayers">
             <summary>
@@ -7905,11 +8622,6 @@
         <member name="F:Quantum.QuantumStaticSphereCollider3D.PositionOffset">
             <summary>
             The position offset added to the <see cref="P:UnityEngine.Transform.position"/> during baking.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumStaticSphereCollider3D.Settings">
-            <summary>
-            Additional static collider settings.
             </summary>
         </member>
         <member name="M:Quantum.QuantumStaticSphereCollider3D.UpdateFromSourceCollider">
@@ -8675,6 +9387,27 @@
             <param name="assetObject">Entity prototype asset object</param>
             <param name="selfViewAsset">Associated view asset</param>
         </member>
+        <member name="T:Quantum.QuantumMapBakeMetadata">
+            <summary>
+            Bake metadata stored as a hidden sub-asset of a baked <see cref="T:Quantum.Map"/>. Holds editor-side data
+            that supports the baked map but is never read by the simulation.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumMapBakeMetadata.EntityPrototypesIds">
+            <summary>
+            Folded GlobalObjectIds of the entity prototype sources, index-aligned with <see cref="F:Quantum.Map.MapEntities"/>.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumMapBakeMetadata.StaticColliders2DIds">
+            <summary>
+            Folded GlobalObjectIds of the 2D static collider sources, index-aligned with <see cref="F:Quantum.Map.StaticColliders2D"/>.
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumMapBakeMetadata.StaticColliders3DIds">
+            <summary>
+            Folded GlobalObjectIds of the 3D static collider sources, index-aligned with <see cref="F:Quantum.Map.StaticColliders3D"/>.
+            </summary>
+        </member>
         <member name="T:Quantum.QuantumMapBakeAssemblyAttribute">
             <summary>
             This assembly attribute needs to be set inside custom assemblies that required 
@@ -8758,6 +9491,13 @@
             </summary>
             <param name="data">The MapData object that is currently baked.</param>
         </member>
+        <member name="M:Quantum.MapDataBakerCallback.OnBakeTerrains(Quantum.QuantumMapData,System.Collections.Generic.List{Quantum.QuantumStaticTerrainCollider3D})">
+            <summary>
+            Is called after terrain colliders in the given scene are baked.
+            </summary>
+            <param name="data">The MapData object that is currently baked.</param>
+            <param name="terrainColliders">List of baked terrain colliders.</param>
+        </member>
         <member name="T:Quantum.QuantumMapDataBakeFlags">
             <summary>
             The QuantumEditorAutoBaker script uses this enumeration to configure what steps to build
@@ -8771,7 +9511,9 @@
         </member>
         <member name="F:Quantum.QuantumMapDataBakeFlags.BakeMapData">
             <summary>
-            Bake <see cref="F:Quantum.QuantumMapDataBakeFlags.BakeMapPrototypes"/> and <see cref="F:Quantum.QuantumMapDataBakeFlags.BakeMapColliders"/>
+            Bake <see cref="F:Quantum.QuantumMapDataBakeFlags.BakeMapPrototypes"/>,
+            <see cref="F:Quantum.QuantumMapDataBakeFlags.BakeMapColliders"/> and
+            <see cref="F:Quantum.QuantumMapDataBakeFlags.BakeMapTerrains"/>
             </summary>
         </member>
         <member name="F:Quantum.QuantumMapDataBakeFlags.BakeMapPrototypes">
@@ -8782,6 +9524,11 @@
         <member name="F:Quantum.QuantumMapDataBakeFlags.BakeMapColliders">
             <summary>
             Bake map colliders
+            </summary>
+        </member>
+        <member name="F:Quantum.QuantumMapDataBakeFlags.BakeMapTerrains">
+            <summary>
+            Bake Terrain Collider assets.
             </summary>
         </member>
         <member name="F:Quantum.QuantumMapDataBakeFlags.BakeUnityNavMesh">
@@ -8835,417 +9582,6 @@
             Uses the Unity NavMesh areas to directly generate regions and use according area names. Limited to 30 different global regions.
             </summary>
         </member>
-        <member name="T:Quantum.QuantumNavMesh">
-            <summary>
-            This class is a collection of utility methods to import Unity NavMesh data into Quantum NavMesh data.
-            </summary>
-            <summary>
-            This class is a collection of utility methods to import Unity NavMesh data into Quantum NavMesh data.
-            </summary>
-        </member>
-        <member name="T:Quantum.QuantumNavMesh.ImportSettings">
-            <summary>
-            The Unity navmesh import settings.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.WeldIdenticalVertices">
-            <summary>
-            The Unity NavMesh is a collection of non - connected triangles, this option is very important and combines shared vertices.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.WeldVertexEpsilon">
-            <summary>
-            Don't make the epsilon too small, vertices to fuse are missed, also don't make the value too big as it will deform your navmesh. Min = float.Epsilon.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.DelaunayTriangulation">
-            <summary>
-            Post processes imported Unity navmesh with a Delaunay triangulation to reduce long triangles.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.DelaunayTriangulationRestrictToPlanes">
-            <summary>
-            In 3D the triangulation can deform the navmesh on slopes, check this option to restrict the triangulation to triangles that lie in the same plane.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.FixTrianglesOnEdges">
-            <summary>
-            Sometimes vertices are lying on other triangle edges, this will lead to unwanted borders being detected, this option splits those vertices.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.FixTrianglesOnEdgesEpsilon">
-            <summary>
-            Increase this value when borders inside the navmesh are generated.
-            Start by setting the epsilon to 0.0001 and never increase to more than 0.001.
-            Default is 1e-6f (0.000001f).
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.FixTrianglesOnEdgesHeightEpsilon">
-            <summary>
-            Make the height offset considerably larger than FixTrianglesOnEdgesEpsilon to better detect degenerate triangles. Is the navmesh becomes deformed chose a smaller epsilon. . Min = float.Epsilon. Default is 0.05.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.LinkErrorCorrection">
-            <summary>
-            Automatically correct navmesh link position to the closest triangle by searching this distance (default is 0).
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.ClosestTriangleCalculation">
-            <summary>
-            SpiralOut will be considerably faster but fallback triangles can be null.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.ClosestTriangleCalculationDepth">
-            <summary>
-            Number of cells to search triangles in neighbors.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.EnableQuantum_XY">
-            <summary>
-            Activate this and the navmesh baking will flip Y and Z to support navmeshes generated in the XY plane.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.MinAgentRadius">
-            <summary>
-            The agent radius that the navmesh is build for. The value is retrieved from Unity settings when baking in Editor.
-            </summary>
-        </member>
-        <member name="P:Quantum.QuantumNavMesh.ImportSettings.ImportRegions">
-            <summary>
-            Toggle the Quantum region import.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.ImportRegionMode">
-            <summary>
-            Toggle the region import mode. Default is Simple.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.ImportAutoGeneratedLinks">
-            <summary>
-            If Quantum should import Links that were auto generated by Unity.
-            Only works in Unity 2022 and above, since Unity did not generate links before that.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.RegionDetectionMargin">
-            <summary>
-            The artificial margin is necessary because the Unity NavMesh does not fit the source size very well. The value is added to the navmesh area and checked against all Quantum Region scripts to select the correct region id.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.ImportSettings.RegionAreaIds">
-            <summary>
-            The region area ids to import.
-            </summary>
-        </member>
-        <member name="T:Quantum.QuantumNavMesh.Vertex">
-            <summary>
-            Intermediate mesh vertex data structure.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.Vertex.Id">
-            <summary>
-            The vertex id.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.Vertex.Position">
-            <summary>
-            The world position.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vertex.Convert">
-            <summary>
-            Convert the vertex data to a Quantum NavMesh vertex.
-            </summary>
-            <returns></returns>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.DefaultMinAgentRadius">
-            <summary>
-            The default minimum agent radius. Will be updated during importing the Unity navmesh.
-            </summary>
-        </member>
-        <member name="T:Quantum.QuantumNavMesh.ImportUtils">
-            <summary>
-            The navmesh import utility methods.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.ImportUtils.WeldIdenticalVertices(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Single,System.Action{System.Single})">
-            <summary>
-            Tries to merge vertices that are very close to each other into a single vertex.
-            </summary>
-            <param name="vertices">Mesh vertices collection.</param>
-            <param name="triangles">Mesh triangles collection.</param>
-            <param name="cleanupEpsilon">The epsilon to detect identical vertices.</param>
-            <param name="reporter">Progress bar.</param>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.ImportUtils.RemoveDegenerateTriangles(Quantum.NavMeshBakeDataTriangle[]@,System.Action{System.Single})">
-            <summary>
-            Identifies and removes degenerate triangles from the mesh triangles collection.
-            Will copy and recreated the triangles array when any degenerate triangles has been found.
-            The cleanup has to be performed before creating the links, otherwise the links will reference invalid triangles.
-            </summary>
-            <param name="triangles">Triangle array</param>
-            <param name="reporter">Progress reporter</param>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.ImportUtils.RemoveUnusedVertices(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Action{System.Single})">
-            <summary>
-            Removes unused vertices from the vertex array.
-            </summary>
-            <param name="vertices">Mesh vertices collection.</param>
-            <param name="triangles">Mesh triangles collection.</param>
-            <param name="reporter">Progress bar.</param>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.ImportUtils.ImportRegionsSimple(Quantum.NavMeshBakeDataTriangle[]@,System.Collections.Generic.List{System.String}@,System.Collections.Generic.Dictionary{System.Int32,System.String},System.Collections.Generic.List{System.Int32},System.Action{System.Single})">
-            <summary>
-            Use the Unity navmesh areas encoded into the Unity navmesh to generate Quantum regions.
-            </summary>
-            <param name="triangles">Imported Navmesh triangles</param>
-            <param name="regionMap">The global region map, will add new regions</param>
-            <param name="unityAreaMap">Map a Unity area id to a area name</param>
-            <param name="regionIncludeList">Include these region ids</param>
-            <param name="reporter">Progress bar</param>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.ImportUtils.ImportRegions(UnityEngine.SceneManagement.Scene,Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Int32,System.Collections.Generic.List{System.String}@,System.Single)">
-            <summary>
-            Tries to identify what region individual vertices belong to. Uses the original <see cref="T:Quantum.QuantumNavMeshRegion"/> scripts to cast vertices against.
-            </summary>
-            <param name="scene">Unity scene.</param>
-            <param name="vertices">Mesh vertices collection.</param>
-            <param name="triangles">Mesh triangles collection.</param>
-            <param name="t">The current triangle index to analyze.</param>
-            <param name="regionMap">The list of regions already found.</param>
-            <param name="regionDetectionMargin">The region detection margin used to enlarge the reference share from the <see cref="T:Quantum.QuantumNavMeshRegion"/> script.</param>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.ImportUtils.FixTrianglesOnEdges(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Int32,System.Int32,System.Single,System.Single)">
-            <summary>
-            Tries to detect degenerated triangles that are emit by the Unity navmesh triangulation. This detects when triangles have vertices on other triangle edges.
-            </summary>
-            <param name="vertices">Mesh vertices collection.</param>
-            <param name="triangles">Mesh triangles collection.</param>
-            <param name="t">The current triangle index to analyze.</param>
-            <param name="v0">The first vertex.</param>
-            <param name="epsilon">The epsilon to use when detecting vertex on edges.</param>
-            <param name="epsilonHeight">The explicit height epsilon to use.</param>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.ImportUtils.FindTriangleOnEdge(Quantum.QuantumNavMesh.Vertex[]@,Quantum.NavMeshBakeDataTriangle[]@,System.Int32,System.Int32,System.Int32,System.Single,System.Single,System.Int32@)">
-            <summary>
-            Detects if a triangle <paramref name="tri"/> has a vertex on the segment between <paramref name="v0"/> and <paramref name="v1"/>.
-            </summary>
-            <returns>The triangle that lies on the segment or -1.</returns>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.ImportUtils.SplitTriangle(Quantum.NavMeshBakeDataTriangle[]@,System.Int32,System.Int32,System.Int32)">
-            <summary>
-            Splits a triangle into two triangles by inserting a new vertex at the edge between <paramref name="v0"/> and v0 + 1.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.CreateUnityNavmeshAreaMap">
-            <summary>
-            Create a dictionary that maps Unity NavMesh area ids to area names.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.ImportFromUnity(UnityEngine.SceneManagement.Scene,Quantum.QuantumNavMesh.ImportSettings,System.String,System.Collections.Generic.IEnumerable{UnityEngine.Object})">
-            <summary>
-            Import a Unity NavMesh into Quantum NavMesh data.
-            </summary>
-            <param name="scene">The Unity scene.</param>
-            <param name="settings">The navmesh import settings.</param>
-            <param name="name">The navmesh.</param>
-            <param name="existingData">The existing NavMeshData from Unity (optional)</param>
-            <returns>The resulting imported navmesh.</returns>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.FindSmallestAgentRadius(UnityEngine.GameObject[])">
-            <summary>
-            Iterates through all navmesh surfaces and detect the smallest agent radius used.
-            </summary>
-            <param name="navmeshSurfaces">List of navmesh surfaces to analyze.</param>
-            <returns>The smallets agent radius in FP.</returns>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.UnityNavMeshLinkData.#ctor(UnityEditor.SerializedProperty,System.Int32)">
-            <summary>
-            Construct from a serialized OffMeshLink element inside NavMeshData
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.UnityNavMeshLinkData.ExtractFrom(UnityEngine.AI.NavMeshData)">
-            <summary>
-            Extract all OffMeshLinks from a NavMeshData into UnityNavMeshLinkData[]
-            </summary>
-        </member>
-        <member name="T:Quantum.QuantumNavMesh.Vector2Double">
-            <summary>
-            Math class only used by <see cref="T:Quantum.QuantumNavMesh"/> import calculations. Uses double precision.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.Vector2Double.X">
-            <summary>
-            X component of the vector.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.Vector2Double.Y">
-            <summary>
-            Y component of the vector.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector2Double.#ctor(System.Double,System.Double)">
-            <summary>
-            Create new vector.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector2Double.op_Subtraction(Quantum.QuantumNavMesh.Vector2Double,Quantum.QuantumNavMesh.Vector2Double)">
-            <summary>
-            Minus operator.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector2Double.Distance(Quantum.QuantumNavMesh.Vector2Double,Quantum.QuantumNavMesh.Vector2Double)">
-            <summary>
-            Calculate the distance between two points.
-            </summary>
-            <param name="a">Point a.</param>
-            <param name="b">Point b.</param>
-            <returns>The distance between to points.</returns>
-        </member>
-        <member name="T:Quantum.QuantumNavMesh.Vector3Double">
-            <summary>
-            Math class only used by <see cref="T:Quantum.QuantumNavMesh"/> import calculations. Uses double precision.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.Vector3Double.X">
-            <summary>
-            X component of the vector.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.Vector3Double.Y">
-            <summary>
-            Y component of the vector.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumNavMesh.Vector3Double.Z">
-            <summary>
-            Z component of the vector.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.#ctor(System.Double,System.Double,System.Double)">
-            <summary>
-            Crate a new vector.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.#ctor(Photon.Deterministic.FPVector3)">
-            <summary>
-            Create a new vector using a Quantum fixed point vector.
-            </summary>
-            <param name="v"></param>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.#ctor(UnityEngine.Vector3)">
-            <summary>
-            Create a new vector using a Unity vector.
-            </summary>
-            <param name="v"></param>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Equals(System.Object)">
-            <summary>
-            Returns a value indicating whether this instance is equal to a specified Vector3Double value.
-            </summary>
-            <param name="obj">An Vector3Double value to compare to this instance.</param>
-            <returns><see langword="true"/> if other has the same value as this instance; otherwise, <see langword="false"/>.</returns>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.GetHashCode">
-            <summary>
-            Overrides the default hash function.
-            </summary>
-            <returns>A hash code for the current object.</returns>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Equality(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
-            <summary>
-            Operator override for which checks if two instances of Vector3Double are equal.
-            </summary>
-            <returns><see langword="true"/> if the instances are equal.</returns>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Inequality(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
-            <summary>
-            Operator override for which checks if two instances of REPLACE are not equal.
-            </summary>
-            <returns><see langword="true"/> if the instances are not equal.</returns>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Subtraction(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
-            <summary>
-            Subtracts two Vector3Double instances.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Addition(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
-            <summary>
-            Adds two Vector3Double instances.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Multiply(Quantum.QuantumNavMesh.Vector3Double,System.Double)">
-            <summary>
-            Multiplies a Vector3Double instance with a scalar.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.op_Multiply(System.Double,Quantum.QuantumNavMesh.Vector3Double)">
-            <summary>
-            Multiplies a Vector3Double instance with a scalar.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.AsFPVector">
-            <summary>
-            Converts into fixed point vector. Only safe during editor as it uses <see cref="M:Photon.Deterministic.FP.FromFloat_UNSAFE(System.Single)"/>.
-            </summary>
-            <returns></returns>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.AsVector">
-            <summary>
-            Converts into Unity vector.
-            </summary>
-            <returns></returns>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.SqrMagnitude">
-            <summary>
-            Returns the square magnitude of the vector.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.SqrMagnitude(Quantum.QuantumNavMesh.Vector3Double)">
-            <summary>
-            Returns the square magnitude <paramref name="v"/>
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Magnitude">
-            <summary>
-            Returns the magnitude of the vector.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Distance(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
-            <summary>
-            Returns the distance between two points.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Normalize">
-            <summary>
-            Normalized the vector.
-            </summary>
-            <exception cref="T:System.ArgumentException">Is raised when the magnitude is 0.</exception>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.ToString">
-            <summary>
-            Converts the numeric value of this instance to its equivalent string representation.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Dot(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
-            <summary>
-            Returns the dot product of two vectors.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.Cross(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double)">
-            <summary>
-            Returns the cross product of two vectors.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.IsPointBetween(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,System.Single,System.Single)">
-            <summary>
-            Calculates if the point <paramref name="p"/> is between the two points <paramref name="v0"/> and <paramref name="v1"/>.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumNavMesh.Vector3Double.ClosestDistanceToTriangle(Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double,Quantum.QuantumNavMesh.Vector3Double@)">
-            <summary>
-            Calculates the closest distance from point <paramref name="p"/> to the triangle defined by <paramref name="v0"/>, <paramref name="v1"/> and <paramref name="v2"/>.
-            </summary>
-        </member>
         <member name="T:Quantum.QuantumStaticCircleCollider2D">
             <summary>
             The script will create a static 2D circle collider during Quantum map baking.
@@ -9269,11 +9605,6 @@
         <member name="F:Quantum.QuantumStaticCircleCollider2D.Height">
             <summary>
             The optional 2D pseudo height of the collider.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumStaticCircleCollider2D.Settings">
-            <summary>
-            Additional static collider settings.
             </summary>
         </member>
         <member name="M:Quantum.QuantumStaticCircleCollider2D.UpdateFromSourceCollider">
@@ -9490,7 +9821,7 @@
         </member>
         <member name="M:Quantum.QuantumRunnerRegistry.ShutdownAll">
             <summary>
-            Calls <see cref="!:SessionRunner.Shutdown(ShutdownCause)"/> on all runners.
+            Calls <see cref="M:Quantum.SessionRunner.Shutdown(Quantum.ShutdownCause,System.String)"/> on all runners.
             </summary>
         </member>
         <member name="M:Quantum.QuantumRunnerRegistry.ShutdownAllAsync">

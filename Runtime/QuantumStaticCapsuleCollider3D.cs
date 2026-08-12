@@ -32,11 +32,6 @@ namespace Quantum {
     /// </summary>
     [InlineHelp] 
     public FPVector3 RotationOffset;
-    /// <summary>
-    /// Additional static collider settings.
-    /// </summary>
-    [InlineHelp, DrawInline, Space]
-    public QuantumStaticColliderSettings Settings = new QuantumStaticColliderSettings();
 
     internal CapsuleDirection3D Direction = CapsuleDirection3D.Y;
     
@@ -81,7 +76,8 @@ namespace Quantum {
     public void GetShapeSettings(out FPVector3 position, out FPQuaternion rotation, out FP capsuleRadius, out FP capsuleHeight) {
       UpdateFromSourceCollider();
 
-      var absScale = FPVector3.Abs(transform.lossyScale.ToFPVector3());
+      var lossyScale = transform.lossyScale.ToFPVector3();
+      var absScale = FPVector3.Abs(lossyScale);
 
       FP radiusScale;
       FP heightScale;
@@ -110,9 +106,9 @@ namespace Quantum {
       capsuleHeight = Height * heightScale;
 
       FPVector3 scaledPosOffset;
-      scaledPosOffset.X = PositionOffset.X * absScale.X;
-      scaledPosOffset.Y = PositionOffset.Y * absScale.Y;
-      scaledPosOffset.Z = PositionOffset.Z * absScale.Z;
+      scaledPosOffset.X = PositionOffset.X * lossyScale.X;
+      scaledPosOffset.Y = PositionOffset.Y * lossyScale.Y;
+      scaledPosOffset.Z = PositionOffset.Z * lossyScale.Z;
 
       var fpTransform = Transform3D.Create(transform.position.ToFPVector3(), transform.rotation.ToFPQuaternion());
       position = fpTransform.TransformPoint(scaledPosOffset);
@@ -132,7 +128,10 @@ namespace Quantum {
         StaticData = context.MakeStaticData(gameObject, Settings),
         ShapeType = Shape3DType.Capsule,
         CapsuleRadius = radius,
-        CapsuleHeight = height
+        CapsuleHeight = height,
+#if QUANTUM_ENABLE_ADDON_NAVIGATION
+        QNavMeshData = QNavMeshData,
+#endif
       });
     }
 #else 

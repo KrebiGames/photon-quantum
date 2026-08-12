@@ -25,22 +25,19 @@ namespace Quantum {
   /// The script will create a static 3D terrain collider during Quantum map baking.
   /// </summary>
   [ExecuteInEditMode]
+#if QUANTUM_ENABLE_TERRAIN && !QUANTUM_DISABLE_TERRAIN
+  [RequireComponent(typeof(Terrain))]
+#endif
   public class QuantumStaticTerrainCollider3D : QuantumStaticCollider3DSource {
     /// <summary>
     /// The Quantum terrain collider asset.
     /// </summary>
-    [InlineHelp]
+    [InlineHelp, MultiTypeReference(typeof(Quantum.TerrainCollider))]
     public TerrainCollider Asset;
     
     /// <inheritdoc cref="TerrainBakeResolutionDivisor"/>
     [InlineHelp]
     public Quantum.TerrainBakeResolutionDivisor BakeResolutionDivisor = TerrainBakeResolutionDivisor.MatchSource;
-
-    /// <summary>
-    /// Additional static collider settings.
-    /// </summary>
-    [InlineHelp, DrawInline, Space]
-    public QuantumStaticColliderSettings Settings = new QuantumStaticColliderSettings();
 
     /// <summary>
     /// The physics solver will resolve sphere and capsule shapes against terrain collisions as if it was a regular flat and smooth plane.
@@ -68,7 +65,7 @@ namespace Quantum {
       
       FPMathUtils.LoadLookupTables();
       var t = GetComponent<Terrain>();
-      Bake(Asset, t.terrainData, BakeResolutionDivisor);
+      Asset.QHeightMap = Bake(t.terrainData, BakeResolutionDivisor);
 #if UNITY_EDITOR
       UnityEditor.EditorUtility.SetDirty(Asset);
       UnityEditor.EditorUtility.SetDirty(this);
@@ -77,10 +74,12 @@ namespace Quantum {
     }
 
 #if QUANTUM_ENABLE_TERRAIN && !QUANTUM_DISABLE_TERRAIN
-    internal static void Bake(Quantum.TerrainCollider asset, UnityEngine.TerrainData terrainData, TerrainBakeResolutionDivisor bakeResDivisor = TerrainBakeResolutionDivisor.MatchSource) {
+    internal static QuantumHeightMap Bake(UnityEngine.TerrainData terrainData, TerrainBakeResolutionDivisor bakeResDivisor = TerrainBakeResolutionDivisor.MatchSource) {
+      var qHeightMap = new QuantumHeightMap();
+
       var sourceRes = terrainData.heightmapResolution;
       var newRes = GetResolution(sourceRes, bakeResDivisor, out var resDivisor);
-      asset.Resolution = newRes;
+      qHeightMap.Resolution = newRes;
 
       // Unity heightmapScale: x/z are per-vertex spacing in world units, y is max terrain height (not spacing).
       var srcScale = terrainData.heightmapScale;
@@ -89,9 +88,9 @@ namespace Quantum {
         srcScale.y,
         srcScale.z * resDivisor
       ).ToFPVector3();
-      asset.Scale = newScale;
+      qHeightMap.Scale = newScale;
 
-      asset.HeightMap = new FP[newRes * newRes];
+      qHeightMap.HeightMap = new FP[newRes * newRes];
 
       // Box-filter average over a (divisor + 1) x (divisor + 1) window centered on the source vertex
       var halfWindow = resDivisor / 2;
@@ -112,13 +111,13 @@ namespace Quantum {
               count++;
             }
           }
-          asset.HeightMap[j + i * newRes] = sum / count;
+          qHeightMap.HeightMap[j + i * newRes] = sum / count;
         }
       }
 
       // support to Terrain Paint Holes: https://docs.unity3d.com/2019.4/Documentation/Manual/terrain-PaintHoles.html
       // Conservative OR: an output cell is a hole if any source cell in its divisor x divisor block is a hole.
-      asset.HoleMask = new ulong[(newRes * newRes - 1) / 64 + 1];
+      qHeightMap.HoleMask = new ulong[(newRes * newRes - 1) / 64 + 1];
       for (var i = 0; i < newRes - 1; i++) {
         for (var j = 0; j < newRes - 1; j++) {
           var hasHole = false;
@@ -133,10 +132,12 @@ namespace Quantum {
             }
           }
           if (hasHole) {
-            asset.SetHole(i, j);
+            qHeightMap.SetHole(i, j);
           }
         }
       }
+
+      return qHeightMap;
     }
 
     private static int GetResolution(int sourceRes, TerrainBakeResolutionDivisor resolutionDivisor, out int resDivisor) {
@@ -165,14 +166,30 @@ namespace Quantum {
     }
 #endif
 
+    public QuantumHeightMap GetQHeightMap() {
+      if (Asset) {
+        return Asset.QHeightMap;
+      }
+
+#if QUANTUM_ENABLE_TERRAIN && !QUANTUM_DISABLE_TERRAIN
+      var terrain = GetComponent<Terrain>();
+      if (terrain != null && terrain.terrainData != null) {
+        return Bake(terrain.terrainData, BakeResolutionDivisor);
+      }
+#endif
+
+      return null;
+    }
+
     public override void GetColliders(QuantumStaticCollider3DBakeContext context) {
 #if QUANTUM_ENABLE_TERRAIN && !QUANTUM_DISABLE_TERRAIN
-      if (!Asset) {
+      var qHeightMap = GetQHeightMap();
+      if (qHeightMap == null) {
         return;
       }
-      
+
       var staticColliderIndex = context.StaticColliderCount;
-      
+
       context.Add(new MapStaticCollider3D {
         Position                   = default(FPVector3),
         Rotation                   = FPQuaternion.Identity,
@@ -180,9 +197,13 @@ namespace Quantum {
         SmoothSphereMeshCollisions = SmoothSphereMeshCollisions,
         ShapeType = Shape3DType.Mesh,
         StaticData = context.MakeStaticData(gameObject, Settings),
+#if QUANTUM_ENABLE_ADDON_NAVIGATION
+        QNavMeshData = QNavMeshData,
+#endif
       });
-      
-      context.Add(Asset.CreateMeshTriangles(transform.position.ToFPVector3(), staticColliderIndex));
+
+      var label = Asset ? Asset.Identifier.ToString() : gameObject.name;
+      context.Add(qHeightMap.CreateMeshTriangles(transform.position.ToFPVector3(), staticColliderIndex, label));
 #endif
     }
   }

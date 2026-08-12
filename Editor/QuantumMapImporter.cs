@@ -18,42 +18,22 @@ namespace Quantum.Editor {
 #if UNITY_EDITOR && !UNITY_2022_2_OR_NEWER
   using ManagedReferenceUtility = UnityEditor.SerializationUtility;
 #endif
-
-
-  [ScriptedImporter(4, Extension, ImportQueueOffset)]
+  
+  [ScriptedImporter(7, Extension, ImportQueueOffset)]
   [QuantumAssetObjectScriptedImporter(typeof(Quantum.Map))]
   partial class QuantumMapImporter : ScriptedImporter {
     public const int ImportQueueOffset = 100100;
     public const string Extension = "qmap";
     public const string ExtensionWithDot = "." + Extension;
-    /// <summary>
-    /// Default location of the bake cache folder, used when <see cref="OverrideBakeCacheRoot"/> is not implemented or leaves the value unchanged.
-    /// </summary>
-    public const string DefaultBakeCacheRoot = "Assets/QuantumUser/BakeCache";
 
-    /// <summary>
-    /// Project-relative folder under which baked <c>.qmapdata</c> and <c>.qnavdata</c> files are written.
-    /// Resolves to <see cref="DefaultBakeCacheRoot"/> unless a partial implementation of <see cref="OverrideBakeCacheRoot"/> assigns a different path.
-    /// </summary>
-    public static string BakeCacheRoot {
-      get {
-        var root = DefaultBakeCacheRoot;
-        OverrideBakeCacheRoot(ref root);
-        return root;
-      }
-    }
-
-    /// <summary>
-    /// Optional extension point for relocating the bake cache folder. Implement as a second partial of <see cref="QuantumMapImporter"/>
-    /// and assign the desired project-relative path to <paramref name="root"/>. Leave unchanged to keep <see cref="DefaultBakeCacheRoot"/>.
-    /// </summary>
-    /// <param name="root">Seeded with <see cref="DefaultBakeCacheRoot"/>; overwrite to change where bake cache files are stored.</param>
-    static partial void OverrideBakeCacheRoot(ref string root);
+    public const string BakedMapExtension = "qmapdata";
+    public const string BakedNavExtension = "qnavdata";
 
     const string NavMeshAssetIdPrefix = "nm-";
     const string NavMeshDataAssetIdPrefix = "nmdata-";
     const string MapAssetId = "main";
     const string MeshAssetId = "mesh";
+    const string AdditionalAssetIdPrefix = "a-";
 
     static readonly ProfilerMarker s_importMarker = new($"{nameof(QuantumMapImporter)}.{nameof(OnImportAsset)}");
     static readonly ProfilerMarker s_loadMapMarker = new($"{nameof(QuantumMapImporter)}.LoadMapBakeCache");
@@ -81,9 +61,17 @@ namespace Quantum.Editor {
         try {
           action((MapDataBakerCallback)Activator.CreateInstance(t));
         } catch (Exception ex) {
-          Quantum.Log.Exception(ex);
+          Quantum.Log.Exception($"Error when invoking importer callbacks on {t.FullName}", ex);
         }
       }
+    }
+
+    internal static string GetBakePath(GUID guid, string extension, bool createFolder = false) {
+      if (createFolder) {
+        Directory.CreateDirectory(QuantumEditorSettings.Instance.BakeCacheRoot);
+      }
+
+      return $"{QuantumEditorSettings.Instance.BakeCacheRoot}/{guid}.{extension}";
     }
 
     public override void OnImportAsset(AssetImportContext ctx) {
@@ -94,8 +82,8 @@ namespace Quantum.Editor {
 
       var guid = AssetDatabase.GUIDFromAssetPath(ctx.assetPath);
 
-      var mapBakeCachePath = $"{BakeCacheRoot}/{guid}.qmapdata";
-      var navBakeCachePath = $"{BakeCacheRoot}/{guid}.qnavdata";
+      var mapBakeCachePath = GetBakePath(guid, BakedMapExtension);
+      var navBakeCachePath = GetBakePath(guid, BakedNavExtension);
 
       ctx.DependsOnSourceAsset(mapBakeCachePath);
       ctx.DependsOnSourceAsset(navBakeCachePath);
@@ -118,6 +106,14 @@ namespace Quantum.Editor {
             } else {
               mapAsset.StaticColliders3DTrianglesData = default;
             }
+
+            var metadata = ScriptableObject.CreateInstance<QuantumMapBakeMetadata>();
+            metadata.name = $"{baseName}_metadata";
+            metadata.hideFlags = HideFlags.HideInHierarchy | HideFlags.DontSaveInBuild;
+            metadata.EntityPrototypesIds = mapDesc.EntityPrototypesIds ?? Array.Empty<ulong>();
+            metadata.StaticColliders2DIds = mapDesc.StaticColliders2DIds ?? Array.Empty<ulong>();
+            metadata.StaticColliders3DIds = mapDesc.StaticColliders3DIds ?? Array.Empty<ulong>();
+            ctx.AddObjectToAsset("metadata", metadata);
           }
         } catch (Exception ex) {
           ctx.LogImportError(ex.Message);
@@ -148,6 +144,12 @@ namespace Quantum.Editor {
           if (navDesc.Regions != null) {
             mapAsset.Regions = navDesc.Regions;
           }
+
+          if (navDesc.AdditionalAssets != null) {
+            foreach (var entry in navDesc.AdditionalAssets) {
+              AddBakedAsset(entry.Asset, $"{AdditionalAssetIdPrefix}{entry.Id}", $"{baseName}_{entry.NameSuffix}", parentAssetType: typeof(Map));
+            }
+          }
         } catch (Exception ex) {
           ctx.LogImportError(ex.Message);
         }
@@ -155,11 +157,12 @@ namespace Quantum.Editor {
 
       QuantumEditorLog.TraceImport(ctx.assetPath, $"Imported in {sw.ElapsedMilliseconds}ms");
 
-      void AddBakedAsset(AssetObject asset, string assetId, string assetName, Type parentAssetType) {
+      AssetGuid AddBakedAsset(AssetObject asset, string assetId, string assetName, Type parentAssetType) {
         asset.name = assetName;
         asset.Guid = QuantumUnityDBUtilities.GetExpectedAssetGuid(guid, AssetDatabaseUtils.GetLocalFileIdentifier(asset, assetId), out var _);
         asset.Path = QuantumUnityDBUtilities.GetExpectedAssetPath(ctx.assetPath, assetName, parentAssetType);
         ctx.AddObjectToAsset(assetId, asset);
+        return asset.Guid;
       }
 
       static QuantumMapBakedDataDescriptor LoadDescriptor(string path) {
@@ -188,8 +191,7 @@ namespace Quantum.Editor {
       QuantumEditorLog.TraceImport(assetPath, $"Bake cache");
 
       var guid = AssetDatabase.GUIDFromAssetPath(assetPath);
-      var path = $"{BakeCacheRoot}/{guid}.qmapdata";
-      Directory.CreateDirectory(BakeCacheRoot);
+      var path = GetBakePath(guid, BakedMapExtension, createFolder: true);
       var scene = mapData.gameObject.scene;
       var mapSettings = mapData.Settings;
       Map mapAsset = ScriptableObject.CreateInstance<Map>();
@@ -228,11 +230,25 @@ namespace Quantum.Editor {
         using (var bakeContext = new QuantumStaticCollider2DBakeContext()) {
           var colliders = QuantumUnitySceneManagerUtils.GetComponentsInHierarchyOrder<QuantumStaticCollider2DSource>(roots).ToList();
           InvokeCallbacks(cb => cb.OnCollectColliders2D(mapData, colliders));
-          foreach (var collider in colliders) {
-            collider.GetColliders(bakeContext);
-          }
           
+#if QUANTUM_ENABLE_CLEAN_SCENE_BAKE
+          var sources = mapData.StaticCollider2DReferences;
+          sources.Clear();
+#else
+          var sources = new List<QuantumStaticCollider2DSource>();
+#endif
+          
+          foreach (var collider in colliders) {
+            var count = bakeContext.StaticColliderCount;
+            collider.GetColliders(bakeContext);
+            for (int i = count; i < bakeContext.StaticColliderCount; ++i) {
+              sources.Add(collider);
+            }
+          }
+
           mapAsset.StaticColliders2D = bakeContext.Colliders.ToArray();
+          descriptor.StaticColliders2DIds = AssetDatabaseUtils.FoldSceneObjectIds(sources);
+          DumpFoldedIds(sources, descriptor.StaticColliders2DIds);
         }
 
         // colliders 3d
@@ -240,11 +256,26 @@ namespace Quantum.Editor {
         using (var bakeContext = new QuantumStaticCollider3DBakeContext()) {
           var colliders = QuantumUnitySceneManagerUtils.GetComponentsInHierarchyOrder<QuantumStaticCollider3DSource>(roots).ToList();
           InvokeCallbacks(cb => cb.OnCollectColliders3D(mapData, colliders));
+
+#if QUANTUM_ENABLE_CLEAN_SCENE_BAKE
+          var sources = mapData.StaticCollider3DReferences;
+          sources.Clear();
+#else
+          var sources = new List<QuantumStaticCollider3DSource>();
+#endif
+          
           foreach (var collider in colliders) {
+            var count = bakeContext.StaticColliderCount;
             collider.GetColliders(bakeContext);
+            for (int i = count; i < bakeContext.StaticColliderCount; ++i) {
+              sources.Add(collider);
+            }
           }
 
           mapAsset.StaticColliders3D = bakeContext.Colliders.ToArray();
+          descriptor.StaticColliders3DIds = AssetDatabaseUtils.FoldSceneObjectIds(sources);
+          DumpFoldedIds(sources, descriptor.StaticColliders3DIds);
+
           foreach (var triangle in bakeContext.MeshTriangles) {
             mapAsset.CollidersManagedTriangles.Add(triangle.MeshColliderIndex, triangle);
           }
@@ -254,7 +285,7 @@ namespace Quantum.Editor {
         {
           var prototypes = QuantumUnitySceneManagerUtils.GetComponentsInHierarchyOrder<QuantumEntityPrototypeSource>(roots);
           
-          using (var bakeContext = new QuantumEntityPrototypeBakeContext(new QuantumEntityPrototypeConverter(mapData, prototypes))) {
+          using (var bakeContext = new QuantumEntityPrototypeBakeContext(new QuantumEntityPrototypeConverter(mapData, prototypes), GetNestedAssetGuid)) {
             mapAsset.MapEntities = new ComponentPrototypeSet[prototypes.Length];
             for (int i = 0; i < prototypes.Length; ++i) {
               prototypes[i].GetPrototypes(bakeContext);
@@ -280,6 +311,22 @@ namespace Quantum.Editor {
               ManagedReferenceUtility.SetManagedReferenceIdForObject(mapAsset, components[j], refIdBase + j);
             }
           }
+          
+#if QUANTUM_ENABLE_CLEAN_SCENE_BAKE
+          mapData.MapEntityReferences.Clear();
+#endif
+          for (int i = 0; i < prototypes.Length; ++i) {
+            var view = prototypes[i].GetComponent<QuantumEntityView>();
+#if QUANTUM_ENABLE_CLEAN_SCENE_BAKE
+            mapData.MapEntityReferences.Add(view);
+#endif
+            if (!view) {
+              globalIds[i] = default;
+            }
+          }
+          
+          descriptor.EntityPrototypesIds = AssetDatabaseUtils.FoldSceneObjectIds(globalIds);
+          DumpFoldedIds(prototypes, descriptor.EntityPrototypesIds);
         }
       }
 
@@ -295,7 +342,13 @@ namespace Quantum.Editor {
 
       InvokeCallbacks(cb => cb.OnBake(mapData));
 
+      var fileExisted = File.Exists(path);
+      
       InternalEditorUtility.SaveToSerializedFileAndForget(assets.ToArray(), path, false);
+
+      if (!fileExisted) {
+        AssetDatabase.ImportAsset(path);
+      }
 
       QuantumEditorLog.TraceImport(assetPath, $"Baked cache in {sw.ElapsedMilliseconds}ms");
 
@@ -308,17 +361,23 @@ namespace Quantum.Editor {
 
         return hash;
       }
+      
+      void DumpFoldedIds(IReadOnlyList<MonoBehaviour> sources, ulong[] ids) {
+        for (int i = 0; i < ids.Length; ++i) {
+          QuantumEditorLog.TraceImport(assetPath, $"Resolving folded in QuantumMapImporter (scene {scene.path}): {sources[i]} - {ids[i]} (index: {i})");
+        }
+      }
     }
 
-    public void BakeNavMesh(QuantumMapData mapData) {
+    public void BakeNavMesh(QuantumMapData mapData, bool importFromUnity) {
       using var _ = s_bakeNavMarker.Auto();
       var sw = Stopwatch.StartNew();
 
       QuantumEditorLog.TraceImport(assetPath, $"Bake nav mesh");
 
       var guid = AssetDatabase.GUIDFromAssetPath(assetPath);
-      var path = $"{BakeCacheRoot}/{guid}.qnavdata";
-      Directory.CreateDirectory(BakeCacheRoot);
+      var path = GetBakePath(guid, BakedNavExtension, createFolder: true);
+      var scene = mapData.gameObject.scene;
 
       var descriptor = ScriptableObject.CreateInstance<QuantumMapBakedDataDescriptor>();
       var assets = new List<Object> { descriptor };
@@ -326,25 +385,32 @@ namespace Quantum.Editor {
       var mapSettings = mapData.Settings;
 
       InvokeCallbacks(cb => cb.OnBeforeBakeNavMesh(mapData));
+      
+      List<NavMeshBakeData> allBakeData = new();
+      List<(AssetObject, string)> additionalAssets = new();
+      
+      var navMeshSources = scene.GetComponentsInHierarchyOrder<IQuantumNavMeshSource>(includeInactive: false);
 
-      // collect bake data + parallel source names
-      var allBakeData = new List<NavMeshBakeData>();
+      using (var bakeContext = new QuantumNavMeshBakeContext((type, assetName) => {
+               var asset = (AssetObject)ScriptableObject.CreateInstance(type);
+               asset.name = assetName;
+               asset.Guid = GetNestedAssetGuid(type, assetName);
+               return asset;
+             }, importFromUnity)) {
+        // get all the nav meshes
+        foreach (var source in navMeshSources) {
+          if (source is Behaviour behaviour && !behaviour.isActiveAndEnabled) {
+            continue;
+          }
 
-#if QUANTUM_ENABLE_AI_NAVIGATION && !QUANTUM_DISABLE_AI_NAVIGATION
-      foreach (var source in mapData.GetComponentsInChildren<QuantumMapNavMeshUnity>()) {
-        if (!source.isActiveAndEnabled) {
-          continue;
+          source.GetNavMeshes(bakeContext);
         }
-        
-        var bakeData = source.CreateBakeData();
-        if (bakeData == null) {
-          continue;
-        }
 
-        allBakeData.Add(bakeData);
+        allBakeData = bakeContext.BakeData.ToList();
+        allBakeData.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.Ordinal));
+        additionalAssets = bakeContext.AdditionalAssets.ToList();
       }
-#endif
-
+      
       // callbacks may add more bake data
       InvokeCallbacks(cb => cb.OnCollectNavMeshBakeData(mapData, allBakeData));
 
@@ -414,12 +480,24 @@ namespace Quantum.Editor {
         assets.Add(data);
       }
 
+      var assetEntries = new QuantumMapBakedDataDescriptor.AdditionalAssetEntry[additionalAssets.Count];
+      for (int i = 0; i < additionalAssets.Count; ++i) {
+        var (asset, assetId) = additionalAssets[i];
+        assetEntries[i] = new () {
+          Asset = asset,
+          NameSuffix = asset.name,
+          Id = assetId,
+        };
+        assets.Add(asset);
+      }
+      
       descriptor.Regions = allRegions.ToArray();
       descriptor.NavMeshes = entries;
-
+      descriptor.AdditionalAssets = assetEntries;
+      
       InvokeCallbacks(cb => cb.OnBakeNavMesh(mapData));
 
-      if (navMeshes.Count == 0) {
+      if (navMeshes.Count == 0 && additionalAssets.Count == 0) {
         // nothing to bake — drop any stale .qnavdata so the .qmap reimports without nav
         if (File.Exists(path)) {
           AssetDatabase.DeleteAsset(path);
@@ -428,9 +506,25 @@ namespace Quantum.Editor {
         return;
       }
 
+      var fileExisted = File.Exists(path);
+      
       InternalEditorUtility.SaveToSerializedFileAndForget(assets.ToArray(), path, false);
 
+      if (!fileExisted) {
+        AssetDatabase.ImportAsset(path);
+      }
+      
       QuantumEditorLog.TraceImport(assetPath, $"Baked nav mesh in {sw.ElapsedMilliseconds}ms");
+    }
+
+    AssetGuid GetNestedAssetGuid(Type assetType, string assetId) {
+      var guid = AssetDatabase.GUIDFromAssetPath(assetPath);
+      var so = ScriptableObject.CreateInstance(assetType);
+      try {
+        return QuantumUnityDBUtilities.GetExpectedAssetGuid(guid, AssetDatabaseUtils.GetLocalFileIdentifier(so, $"{AdditionalAssetIdPrefix}{assetId}"), out var _);
+      } finally {
+        DestroyImmediate(so);
+      }
     }
   }
 }

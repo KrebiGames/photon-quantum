@@ -39,19 +39,17 @@ namespace Quantum.Editor {
     /// </summary>
     [InlineHelp]
     public bool UseCustomSettings;
-    
+
     /// <summary/>
-    [Header("Global settings can be changed with partial static \n" +
-            "methods of " + nameof(QuantumCodeGenSettings) + ".\n")]
-    [DirectoryPath]
-    public string OutputFolder = QuantumCodeGenSettings.CodeGenQtnFolderPath;
+    [Header("Global settings can be changed in ProjectSettings")]
+    public string OutputFolder;
     
     /// <summary>
     /// Folder path for Unity-side generated files.
     /// </summary>
     [DirectoryPath]
     [InlineHelp]
-    public string UnityOutputFolderPath = QuantumCodeGenSettings.CodeGenUnityRuntimeFolderPath;
+    public string UnityOutputFolderPath;
 
     /// <summary>
     /// If true, any file (other than .meta) from either output folders will be removed if it was not generated.
@@ -88,14 +86,14 @@ namespace Quantum.Editor {
           }
 
           if (importer.UseCustomSettings) {
-            QuantumCodeGenQtn.Run(new [] { file }, verbose: QuantumCodeGenSettings.IsMigrationEnabled, importer.GeneratorOptions, importer.OutputFolder, importer.UnityOutputFolderPath, importer.DeleteOrphanedFiles);  
+            QuantumCodeGenQtn.Run(new [] { file }, verbose: QuantumCodeGenQtnSettings.IsMigrationEnabled, importer.GeneratorOptions, importer.OutputFolder, importer.UnityOutputFolderPath, importer.DeleteOrphanedFiles);  
           } else {
             runGlobalCodeGen = true;
           }
         }
 
         if (runGlobalCodeGen) {
-          QuantumCodeGenQtn.Run(verbose: QuantumCodeGenSettings.IsMigrationEnabled);
+          QuantumCodeGenQtn.Run(verbose: QuantumCodeGenQtnSettings.IsMigrationEnabled);
         }
       }
     }

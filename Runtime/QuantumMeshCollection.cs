@@ -4,8 +4,19 @@ namespace Quantum {
   /// <summary>
   /// A collection of Unity mesh asset to draw gizmos or scene object. 
   /// </summary>
-  [QuantumGlobalScriptableObject(QuantumUnityEditorPaths.Root + "/Resources/QuantumMeshCollection.asset")]
+  [QuantumGlobalScriptableObject(DefaultPath)]
   public partial class QuantumMeshCollection : QuantumGlobalScriptableObject<QuantumMeshCollection> {
+    /// <summary>
+    /// The default location of the global QuantumDeterministicSessionConfigAsset asset.
+    /// </summary>
+    public const string DefaultPath =
+#if QUANTUM_UPM
+      "Packages/com.photonengine.quantum/Resources/QuantumMeshCollection.asset";
+#else
+      "Assets/Photon/Quantum/Resources/QuantumMeshCollection.asset";
+#endif
+      
+    
     /// <summary>
     /// Capsule mesh.
     /// </summary>

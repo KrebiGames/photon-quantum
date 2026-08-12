@@ -138,7 +138,7 @@ namespace Quantum.Editor {
       // turn current path into path relative to outputPath
       var contents = GeneratePartialQuantumGameCsProj(
         outputPath,
-        Path.GetRelativePath(Path.GetDirectoryName(outputPath), QuantumCodeGenSettings.CodeGenQtnFolderPath),
+        Path.GetRelativePath(Path.GetDirectoryName(outputPath), QuantumCodeGenQtnSettings.Instance.SimulationOutputPath),
         includes,
         defines
       );

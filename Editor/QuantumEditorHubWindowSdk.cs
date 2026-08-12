@@ -51,6 +51,60 @@ namespace Quantum.Editor {
           }
         }
       }
+      else if (packageName == "Quantum-Asteroids") {
+#if QUANTUM_ENABLE_HDRP
+        var scene = SceneManager.GetActiveScene();
+        foreach (var root in scene.GetRootGameObjects())
+        {
+          // Setup the Asteroids HRDP Volume
+          foreach (var volume in root.GetComponentsInChildren<UnityEngine.Rendering.Volume>()) {
+            var profile = volume.sharedProfile;
+            if (profile == null) {
+              continue;
+            }
+
+            profile.Remove<UnityEngine.Rendering.HighDefinition.Fog>();
+            profile.Remove<UnityEngine.Rendering.HighDefinition.VisualEnvironment>();
+            profile.Remove<UnityEngine.Rendering.HighDefinition.Exposure>();
+            profile.Remove<UnityEngine.Rendering.HighDefinition.Bloom>();
+
+            var fog = profile.Add<UnityEngine.Rendering.HighDefinition.Fog>();
+            fog.enabled.value = true;
+
+            var visualEnvironment = profile.Add<UnityEngine.Rendering.HighDefinition.VisualEnvironment>();
+            visualEnvironment.skyType.Override(0); // 0 == "None"
+            AssetDatabase.AddObjectToAsset(visualEnvironment, profile);
+
+            // Fixed exposure stops HDRP auto-exposure from pumping the dark scene up to white.
+            var exposure = profile.Add<UnityEngine.Rendering.HighDefinition.Exposure>();
+            exposure.mode.Override(UnityEngine.Rendering.HighDefinition.ExposureMode.Fixed);
+            exposure.fixedExposure.Override(13);
+            AssetDatabase.AddObjectToAsset(exposure, profile);
+
+            // Bloom intensity 0 removes the glow.
+            var bloom = profile.Add<UnityEngine.Rendering.HighDefinition.Bloom>();
+            bloom.intensity.Override(0f);
+            AssetDatabase.AddObjectToAsset(bloom, profile);
+          }
+
+          // Sky = None alone does NOT clear the camera to black in HDRP — the cameras lack
+          // HDAdditionalCameraData and default to clearing to the sky. Force a solid black background.
+          foreach (var camera in root.GetComponentsInChildren<Camera>(includeInactive: true))
+          {
+            var hdCameraData = camera.GetComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData>();
+            if (hdCameraData == null) {
+              hdCameraData = camera.gameObject.AddComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData>();
+            }
+            hdCameraData.clearColorMode = UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData.ClearColorMode.Color;
+            hdCameraData.backgroundColorHDR = Color.black;
+          }
+        }
+
+        AssetDatabase.SaveAssets();
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+#endif
+      }
     }
 
     /// <summary>
@@ -58,7 +112,6 @@ namespace Quantum.Editor {
     /// </summary>
     public static void InstallAllUserFiles() {
       QuantumGlobalScriptableObjectUtils.EnsureAssetExists<PhotonServerSettings>();
-      QuantumGlobalScriptableObjectUtils.EnsureAssetExists<QuantumEditorSettings>();
       QuantumGlobalScriptableObjectUtils.EnsureAssetExists<QuantumLookupTables>();
       QuantumGlobalScriptableObjectUtils.EnsureAssetExists<QuantumDeterministicSessionConfigAsset>();
       QuantumGlobalScriptableObjectUtils.EnsureAssetExists<QuantumGameGizmosSettingsScriptableObject>();
@@ -94,7 +147,7 @@ namespace Quantum.Editor {
         Directory.CreateDirectory($"{QuantumEditorUserScriptGeneration.FolderPath}/Scenes");
         QuantumEditorMenuCreateScene.CreateNewQuantumScene(
           $"{QuantumEditorUserScriptGeneration.FolderPath}/Scenes/QuantumGameScene.unity",
-          $"{QuantumEditorSettings.Global.DefaultNewAssetsLocation}/QuantumMap.asset",
+          $"{QuantumEditorSettings.Instance.NewAssetsLocation}/QuantumMap.asset",
           saveScene: true,
           addToBuildSettings: true,
           createSceneInfoAsset: true);
@@ -161,7 +214,6 @@ namespace Quantum.Editor {
       get {
         return PhotonServerSettings.TryGetGlobal(out _)
                && QuantumDeterministicSessionConfigAsset.TryGetGlobal(out _)
-               && QuantumEditorSettings.TryGetGlobal(out _)
                && QuantumUnityDB.TryGetGlobal(out _);
       }
     }
@@ -289,7 +341,6 @@ namespace Quantum.Editor {
         DrawGlobalObjectStatus<QuantumDeterministicSessionConfigAsset>();
         DrawGlobalObjectStatus<QuantumUnityDB>();
         DrawGlobalObjectStatus<QuantumLookupTables>();
-        DrawGlobalObjectStatus<QuantumEditorSettings>();
         DrawGlobalObjectStatus<QuantumGameGizmosSettingsScriptableObject>();
         DrawGlobalObjectStatus<QuantumDefaultConfigs>();
         DrawGlobalObjectStatus<QuantumDotnetBuildSettings>();

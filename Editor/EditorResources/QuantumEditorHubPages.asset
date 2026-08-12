@@ -18,6 +18,8 @@ MonoBehaviour:
     Icon: {fileID: 2800000, guid: 0a86c2478d62ef74bb46b7906cac7fb2, type: 3}
     OverwritePage: 
     PopupOncePlayerPrefsKey: 
+    Hide:
+      Value: None
     Elements:
     - Text: 'Welcome to the Quantum 3.1 Game Engine.
 
@@ -185,7 +187,7 @@ MonoBehaviour:
           Class: 
         Asset: {fileID: 0}
         Id: cbfc9fb4-9126-4a15-99e4-65a10d0dec57
-    - Text: Install the asteroids Quantum game sample and press play see the game
+    - Text: Install the Asteroids Quantum game sample and press play see the game
         running in online and local mode.
       Subtext: 
       WidgetMode:
@@ -207,7 +209,7 @@ MonoBehaviour:
       Id: fdd69fd4-9268-44d6-9136-9f67f653477e
       StepElements:
       - Text: Install Quantum Asteroids Sample Game
-        Subtext: Imports the asteroids game sample programmed with Quantum. Parts
+        Subtext: Imports the Asteroids game sample programmed with Quantum. Parts
           of the sample are covered by the Quantum online tutorials.
         WidgetMode:
           Value: InstallPackage
@@ -356,10 +358,12 @@ MonoBehaviour:
     Icon: {fileID: 2800000, guid: 24a22d21fe312f44892796563f01c302, type: 3}
     OverwritePage: 
     PopupOncePlayerPrefsKey: 
+    Hide:
+      Value: None
     Elements:
-    - Text: Install the grey-boxing asteroids game sample programmed in Quantum to
+    - Text: Install the grey-boxing Asteroids game sample programmed in Quantum to
         test local and online mode and make sure to check out the <b>Quantum 100
-        tutorial</b>, it explains step-by-step how the asteroids sample was created.
+        tutorial</b>, it explains step-by-step how the Asteroids sample was created.
       Subtext: 
       WidgetMode:
         Value: Hierarchy
@@ -380,7 +384,7 @@ MonoBehaviour:
       Id: 
       StepElements:
       - Text: Install Quantum Asteroids Sample Game
-        Subtext: Imports the asteroids game sample programmed with Quantum. Parts
+        Subtext: Imports the Asteroids game sample programmed with Quantum. Parts
           of the sample are covered by the Quantum online tutorials
         WidgetMode:
           Value: InstallPackage
@@ -400,7 +404,7 @@ MonoBehaviour:
         Asset: {fileID: 102900000, guid: 4b3bb7bcca93ef748a68af25d13db229, type: 3}
         Id: 
       - Text: Reimport Quantum Asteroids Sample Game
-        Subtext: Reimports the asteroids game sample programmed with Quantum
+        Subtext: Reimports the Asteroids game sample programmed with Quantum
         WidgetMode:
           Value: InstallPackage
         AutoComplete:
@@ -460,8 +464,8 @@ MonoBehaviour:
       Id: 
       StepElements: []
     - Text: Install the <b>menu package</b> to have a fully functional online game
-        menu and it works well together with the asteroids game sample. Create Unity
-        builds to play the asteroids sample <b>online</b> after installing the two
+        menu and it works well together with the Asteroids game sample. Create Unity
+        builds to play the Asteroids sample <b>online</b> after installing the two
         packages and creating an online AppId.
       Subtext: 
       WidgetMode:
@@ -708,6 +712,8 @@ MonoBehaviour:
     Icon: {fileID: 2800000, guid: 80faca055f57d5b449f78efe31607c57, type: 3}
     OverwritePage: 
     PopupOncePlayerPrefsKey: 
+    Hide:
+      Value: 
     Elements:
     - Text: Take a look at the wide selection of support options and channels.
       Subtext: 
@@ -836,6 +842,8 @@ MonoBehaviour:
     Icon: {fileID: 2800000, guid: 59dd7d4958621e649942f3cc5d3ae93f, type: 3}
     OverwritePage: 
     PopupOncePlayerPrefsKey: 
+    Hide:
+      Value: None
     Elements:
     - Text: This sections shows individual Quantum 3 SDK installation steps. Uncompleted
         steps are shown on the welcome screen.
@@ -1029,6 +1037,8 @@ MonoBehaviour:
     Icon: {fileID: 2800000, guid: 9fee294d467aef642a5e60b4c6778684, type: 3}
     OverwritePage: 
     PopupOncePlayerPrefsKey: 
+    Hide:
+      Value: 
     Elements:
     - Text: The Quantum release notes can be found inside the SDK and on our website.
       Subtext: 
@@ -1115,6 +1125,8 @@ MonoBehaviour:
     Icon: {fileID: 2800000, guid: 9fee294d467aef642a5e60b4c6778684, type: 3}
     OverwritePage: 
     PopupOncePlayerPrefsKey: 
+    Hide:
+      Value: 
     Elements:
     - Text: Photon Realtime is our network base layer and it solves problems like
         authentication, matchmaking and fast communication with a scalable approach.
@@ -1182,6 +1194,8 @@ MonoBehaviour:
     Icon: {fileID: 2800000, guid: 9fee294d467aef642a5e60b4c6778684, type: 3}
     OverwritePage: 
     PopupOncePlayerPrefsKey: 
+    Hide:
+      Value: 
     Elements:
     - Text: '<b>Quantum SDK build Information</b>:'
       Subtext: 

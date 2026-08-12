@@ -20,11 +20,6 @@ namespace Quantum.Editor {
     [MenuItem("Tools/Quantum/Find Config/Photon Server Settings", priority = (int)QuantumEditorMenuPriority.GlobalConfigs + 0)]
     public static void SearchPhotonServerSettings() => Selection.activeObject = PhotonServerSettings.TryGetGlobal(out var settings) ? settings : null;
     /// <summary>
-    /// Search and select QuantumEditorSettings.
-    /// </summary>
-    [MenuItem("Tools/Quantum/Find Config/Quantum Editor Settings", priority = (int)QuantumEditorMenuPriority.GlobalConfigs + 11)]
-    public static void SearchQuantumEditorSettings() => Selection.activeObject = QuantumEditorSettings.TryGetGlobal(out var settings) ? settings : null;
-    /// <summary>
     /// Search and select game gizmo settings.
     /// </summary>
     [MenuItem("Tools/Quantum/Find Config/Quantum Gizmo Settings", priority = (int)QuantumEditorMenuPriority.GlobalConfigs + 11)]
@@ -115,9 +110,6 @@ namespace Quantum.Editor {
       }
       using (new GridScope(columnCount, ref currentColumn)) {
         if (GUI.Button(DrawIcon(QuantumEditorSkin.QuantumIcon), "Systems Config", EditorStyles.miniButton)) SearchAndSelect<SystemsConfig>(selectMode: SelectMode.Steps);
-      }
-      using (new GridScope(columnCount, ref currentColumn)) {
-        if (GUI.Button(DrawIcon("BuildSettings.Editor.Small", false), "Editor Settings", EditorStyles.miniButton) && QuantumEditorSettings.TryGetGlobal(out var settings)) Selection.activeObject = settings;
       }
       using (new GridScope(columnCount, ref currentColumn)) {
         if (GUI.Button(DrawIcon("BuildSettings.Editor.Small", false), "Gizmo Settings", EditorStyles.miniButton) && QuantumGameGizmosSettingsScriptableObject.TryGetGlobal(out var settings)) Selection.activeObject = settings;

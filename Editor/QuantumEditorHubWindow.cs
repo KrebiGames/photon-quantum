@@ -150,6 +150,8 @@ namespace Quantum.Editor {
     }
 
     public virtual string AppId { get; set; } = string.Empty;
+    
+    public virtual string AppIdVoice { get; set; } = string.Empty;
 
     public virtual Object SdkAppSettingsAsset { get; }
 

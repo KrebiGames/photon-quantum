@@ -24,7 +24,7 @@ namespace Quantum {
     /// Map settings.
     /// </summary>
     [InlineHelp, DrawInline, DrawIf("IsUsingScriptedImporter", true, CompareOperator.Equal, mode: DrawIfMode.Hide)]
-    public QuantumMapDataSettings Settings;
+    public QuantumMapDataSettings Settings = new();
 #endif
     
     /// <summary>
@@ -45,9 +45,36 @@ namespace Quantum {
 #endif
     public NavMeshSerializeType NavMeshSerializeType;
     
+#if QUANTUM_ENABLE_CLEAN_SCENE_BAKE
+    public List<QuantumStaticCollider2DSource> StaticCollider2DReferences {
+      get => SceneObjectReferences.StaticCollider2DReferences;
+    }
+
+    public List<QuantumStaticCollider3DSource> StaticCollider3DReferences {
+      get => SceneObjectReferences.StaticCollider3DReferences;
+    }
+
+    public List<QuantumEntityView> MapEntityReferences {
+      get => SceneObjectReferences.Views;
+    }
+
+    [NonSerialized]
+    private QuantumMapDataSceneObjectReferences _mapDataSceneObjectReferences;
     
+    internal QuantumMapDataSceneObjectReferences SceneObjectReferences {
+      get {
+        if (!_mapDataSceneObjectReferences) {
+          if (!TryGetComponent(out _mapDataSceneObjectReferences)) {
+            _mapDataSceneObjectReferences = gameObject.AddComponent<QuantumMapDataSceneObjectReferences>();
+            _mapDataSceneObjectReferences.hideFlags = HideFlags.DontSaveInEditor | HideFlags.HideInInspector | HideFlags.NotEditable;
+          }
+        }
+        return _mapDataSceneObjectReferences;
+      }
+    }
+#else
     /// <summary>
-    /// One-to-one mapping of Quantum 2D static collider entries in QAssetMap to their original source scripts. 
+    /// One-to-one mapping of Quantum 2D static collider entries in QAssetMap to their original source scripts.
     /// Purely for convenience to do post bake mappings and not required by the Quantum simulation.
     /// </summary>
     [Header("Baked Data")]
@@ -55,17 +82,18 @@ namespace Quantum {
     public List<QuantumStaticCollider2DSource> StaticCollider2DReferences = new();
 
     /// <summary>
-    /// One-to-one mapping of Quantum 3D static collider entries in QAssetMap to their original source scripts. 
+    /// One-to-one mapping of Quantum 3D static collider entries in QAssetMap to their original source scripts.
     /// Purely for convenience to do post bake mappings and not required by the Quantum simulation.
     /// </summary>
     [InlineHelp, ReadOnly]
     public List<QuantumStaticCollider3DSource> StaticCollider3DReferences = new();
-    
+
     /// <summary>
     /// One-to-one mapping of Quantum map entity entries in QAssetMap to their original source scripts.
     /// </summary>
     [InlineHelp, ReadOnly]
     public List<QuantumEntityView> MapEntityReferences = new();
+#endif
 
     void Update() {
       transform.position = Vector3.zero;

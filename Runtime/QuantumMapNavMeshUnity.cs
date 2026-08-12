@@ -4,12 +4,32 @@ namespace Quantum {
   using UnityEngine;
   using UnityEngine.SceneManagement;
 
-  public class QuantumMapNavMeshUnity : QuantumMonoBehaviour {
+  public class QuantumMapNavMeshUnity : QuantumMonoBehaviour, IQuantumNavMeshSource {
     public GameObject[] NavMeshSurfaces;
     
     [DrawInline]
     public QuantumNavMesh.ImportSettings Settings;
-    
+
+    public void GetNavMeshes(QuantumNavMeshBakeContext context) {
+#if QUANTUM_ENABLE_AI_NAVIGATION && !QUANTUM_DISABLE_AI_NAVIGATION
+      if (context.ImportFromUnity == false) {
+        return;
+      }
+
+      if (!GetComponentInParent<QuantumMapData>()) {
+        // originally this only works for parented by the map data
+        return;
+      }
+      var bakeData = CreateBakeData();
+      if (bakeData == null) {
+        Log.Error($"Could not import navmesh '{name}'");
+        return;
+      }
+
+      context.Add(bakeData);
+#endif
+    }
+
 #if QUANTUM_ENABLE_AI_NAVIGATION && !QUANTUM_DISABLE_AI_NAVIGATION
     public NavMeshBakeData CreateBakeData() {
       // if NavMeshSurface is installed, non-linked surfaces are deactivated so CalculateTriangulation

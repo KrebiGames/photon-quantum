@@ -619,12 +619,13 @@ namespace Quantum {
     QuantumEntityView BindMapEntity(QuantumGame game, Frame frame, EntityRef handle, MapEntityLink mapEntity, QuantumEntityViewBindBehaviour createBehaviour) {
       Assert.Check(_mapData);
 
-      if (_mapData.MapEntityReferences.Count <= mapEntity.Index) {
+      var mapEntityViews = _mapData.MapEntityReferences;
+      if (mapEntityViews.Count <= mapEntity.Index) {
         Log.Error($"MapData on '{_mapData.gameObject.scene.path}' does not have a map entity slot with an index {mapEntity.Index} (entity: {handle}). EntityView will not be assigned. Make sure all baked data is up to date.");
         return null;
       }
 
-      var instance = _mapData.MapEntityReferences[mapEntity.Index];
+      var instance = mapEntityViews[mapEntity.Index];
 
       if (instance == null || instance.BindBehaviour != createBehaviour) {
         return null;

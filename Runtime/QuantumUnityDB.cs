@@ -1009,7 +1009,7 @@ namespace Quantum {
             LoadAssetAsync(guid);
           }
         } catch (Exception ex) {
-          Log.Exception(ex);
+          Log.Exception("Error when processing load queue", ex);
         }
       }
     }

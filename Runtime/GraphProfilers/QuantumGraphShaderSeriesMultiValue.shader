@@ -23,6 +23,7 @@ Shader "Quantum/Multi Value Series Graph"
 		{
 			"Queue"             = "Transparent"
 			"RenderType"        = "Transparent"
+			"RenderPipeline"    = "UniversalPipeline"
 			"PreviewType"       = "Plane"
 			"IgnoreProjector"   = "True"
 			"CanUseSpriteAtlas" = "True"

@@ -15,11 +15,6 @@ namespace Quantum {
     /// </summary>
     [InlineHelp]
     public Mesh Mesh;
-    /// <summary>
-    /// Additional static collider settings.
-    /// </summary>
-    [InlineHelp, DrawInline, Space]
-    public QuantumStaticColliderSettings Settings = new QuantumStaticColliderSettings();
 
     /// <summary>
     /// The physics solver will resolve sphere and capsule shapes against mesh collisions as if the mesh was a regular flat and smooth plane.
@@ -91,7 +86,7 @@ namespace Quantum {
      
       var matrix = transform.localToWorldMatrix.ToFPMatrix4X4();
       
-      return MeshTriangleVerticesCcw.Create(fpVertices, Mesh.triangles, matrix);
+      return MeshTriangleVerticesCcw.Create(fpVertices, Mesh.triangles, matrix, name);
     }
     
     public override void GetColliders(QuantumStaticCollider3DBakeContext context) {
@@ -107,6 +102,9 @@ namespace Quantum {
           SmoothSphereMeshCollisions = SmoothSphereMeshCollisions,
           ShapeType  = Shape3DType.Mesh,
           StaticData = context.MakeStaticData(gameObject, Settings),
+#if QUANTUM_ENABLE_ADDON_NAVIGATION
+        QNavMeshData = QNavMeshData,
+#endif
         });
 
         Assert.Check(meshTris.MeshColliderIndex == staticColliderIndex);

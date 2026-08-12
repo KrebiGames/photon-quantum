@@ -60,11 +60,6 @@ namespace Quantum.Editor {
     public LazyLoadReference<AssetObject>[] ExplicitAssets;
     
     public override void OnImportAsset(AssetImportContext ctx) {
-
-      if (!QuantumEditorSettings.TryGetGlobal(out _)) {
-        ctx.LogImportWarning($"{nameof(QuantumEditorSettings)} hasn't been created yet");
-        return;
-      }
       
       var db = ScriptableObject.CreateInstance<QuantumUnityDBScope>();
       db.Id = AssetDatabase.AssetPathToGUID(ctx.assetPath);

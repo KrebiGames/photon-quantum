@@ -1163,7 +1163,7 @@ namespace Quantum {
             var bytes = this.Context.AssetSerializer.AssetToByteArray(asset);
             fixed (byte* p = bytes) {
               var hash = CRC64.Calculate(0, p, bytes.Length);
-              printer.AddLine($"{asset.Identifier}: {hash}");
+              printer.AddLine($"{asset.Identifier.ToString()}: {hash}");
             }
           }
           printer.ScopeEnd();
@@ -1178,7 +1178,7 @@ namespace Quantum {
 
           var assetSerializer = Context.AssetSerializer;
           if ((dumpFlags & DumpFlag_ReadableDynamicDB) == DumpFlag_ReadableDynamicDB) {
-            printer.AddLine($"NextGuid: {DynamicAssetDB.NextGuid}");
+            printer.AddLine($"NextGuid: {DynamicAssetDB.NextGuid.ToString()}");
             foreach (var asset in DynamicAssetDB.Assets) {
               printer.AddLine($"{asset.GetType().FullName}:");
               printer.ScopeBegin();
@@ -2943,7 +2943,7 @@ namespace Quantum {
     }
     
     private static Type FindStaticType(string name) {
-      foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
+      foreach (var assembly in QuantumPlatform.GetLoadedAssemblies()) {
         Type[] types;
         try {
           types = assembly.GetTypes();
@@ -5415,7 +5415,7 @@ namespace Quantum {
               sb.AppendLine();
               sb.AppendLine("# RECEIVED ASSETDB CHECKSUMS");
               foreach (var entry in Context.AssetDBChecksums) {
-                sb.Append(entry.Item0).Append(": ").Append(entry.Item1).AppendLine();
+                sb.Append(entry.Item0).Append(": ").Append(entry.Item1.ToString()).AppendLine();
               }
 
               _frameDump = QTuple.Create(true, sb.ToString());
@@ -9752,8 +9752,9 @@ namespace Quantum.Core {
 #region Assets/Photon/Quantum/Simulation/Systems/Core/DebugSystem.cs
 
 namespace Quantum.Core {
-  using System;
   using Photon.Deterministic;
+  using System;
+  using System.Diagnostics.CodeAnalysis;
 #if !DEBUG
   using Quantum.Task;
 #endif
@@ -9806,9 +9807,12 @@ namespace Quantum.Core {
     public static event Action<Payload, Exception> CommandExecuted
 #if DEBUG && !QUANTUM_DEBUG_COMMAND_DISABLED
     {
+      [SuppressMessage("Domain reload", "UDR0004:Domain Reload Analyzer")]
       add => _commandExecuted += value;
       remove => _commandExecuted -= value;
     }
+
+    [SuppressMessage("Domain reload", "UDR0001:Domain Reload Analyzer", Justification = "Is reset QuantumStateInspector.Init()")]
     private static Action<Payload, Exception> _commandExecuted;
 #else
     { add { } remove { } }

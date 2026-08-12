@@ -41,11 +41,6 @@ namespace Quantum {
     /// </summary>
     [InlineHelp]
     public FP Height;
-    /// <summary>
-    /// Additional static collider settings.
-    /// </summary>
-    [InlineHelp, DrawInline, Space]
-    public QuantumStaticColliderSettings Settings = new QuantumStaticColliderSettings();
 
     private void OnValidate() {
       Size.X = FPMath.Clamp(Size.X, 0, Size.X);
@@ -119,7 +114,8 @@ namespace Quantum {
     public void GetShapeSettings(out FPVector2 position, out FP rotation, out FPVector2 size, out FP verticalOffset, out FP height) {
       UpdateFromSourceCollider();
 
-      var absScale2D = FPVector2.Abs(transform.lossyScale.ToFPVector2());
+      var lossyScale2D = transform.lossyScale.ToFPVector2();
+      var absScale2D = FPVector2.Abs(lossyScale2D);
 
       FP directionRotation;
       if (Direction == UnityEngine.CapsuleDirection2D.Horizontal) {
@@ -131,8 +127,8 @@ namespace Quantum {
       }
 
       FPVector2 scaledPosOffset;
-      scaledPosOffset.X = PositionOffset.X * absScale2D.X;
-      scaledPosOffset.Y = PositionOffset.Y * absScale2D.Y;
+      scaledPosOffset.X = PositionOffset.X * lossyScale2D.X;
+      scaledPosOffset.Y = PositionOffset.Y * lossyScale2D.Y;
 
       var fpTransform = Transform2D.Create(transform.position.ToFPVector2(), transform.rotation.ToFPRotation2D());
       position = fpTransform.TransformPoint(scaledPosOffset);

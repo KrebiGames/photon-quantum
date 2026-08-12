@@ -27,11 +27,6 @@ namespace Quantum {
     /// </summary>
     [InlineHelp]
     public FPVector3 RotationOffset;
-    /// <summary>
-    /// Additional static collider settings.
-    /// </summary>
-    [InlineHelp, DrawInline, Space]
-    public QuantumStaticColliderSettings Settings = new QuantumStaticColliderSettings();
 
     private void ClampSize() {
       Size.X = FPMath.Clamp(Size.X, 0, Size.X);
@@ -69,7 +64,8 @@ namespace Quantum {
     public void GetShapeSettings(out FPVector3 position, out FPQuaternion rotation, out FPVector3 extents) {
       UpdateFromSourceCollider();
 
-      var absScale = FPVector3.Abs(transform.lossyScale.ToFPVector3());
+      var lossyScale = transform.lossyScale.ToFPVector3();
+      var absScale = FPVector3.Abs(lossyScale);
       var toExtents = absScale * FP._0_50;
 
       extents = new FPVector3(
@@ -79,9 +75,9 @@ namespace Quantum {
       );
 
       FPVector3 scaledPosOffset;
-      scaledPosOffset.X = PositionOffset.X * absScale.X;
-      scaledPosOffset.Y = PositionOffset.Y * absScale.Y;
-      scaledPosOffset.Z = PositionOffset.Z * absScale.Z;
+      scaledPosOffset.X = PositionOffset.X * lossyScale.X;
+      scaledPosOffset.Y = PositionOffset.Y * lossyScale.Y;
+      scaledPosOffset.Z = PositionOffset.Z * lossyScale.Z;
 
       var fpTransform = Transform3D.Create(transform.position.ToFPVector3(), transform.rotation.ToFPQuaternion());
       position = fpTransform.TransformPoint(scaledPosOffset);
@@ -98,7 +94,10 @@ namespace Quantum {
         PhysicsMaterial = Settings.PhysicsMaterial,
         StaticData = context.MakeStaticData(gameObject, Settings),
         ShapeType = Shape3DType.Box,
-        BoxExtents = extents
+        BoxExtents = extents,
+#if QUANTUM_ENABLE_ADDON_NAVIGATION
+        QNavMeshData = QNavMeshData,
+#endif
       });
     }
 #else 

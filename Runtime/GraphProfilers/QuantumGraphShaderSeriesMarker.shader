@@ -20,6 +20,7 @@ Shader "Quantum/Marker Series Graph"
 		{
 			"Queue"             = "Transparent"
 			"RenderType"        = "Transparent"
+			"RenderPipeline"    = "UniversalPipeline"
 			"PreviewType"       = "Plane"
 			"IgnoreProjector"   = "True"
 			"CanUseSpriteAtlas" = "True"

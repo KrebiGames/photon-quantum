@@ -47,12 +47,7 @@ namespace Quantum.Editor {
 
     public override void OnImportAsset(AssetImportContext ctx) {
 
-      if (!QuantumEditorSettings.TryGetGlobal(out var editorSettings)) {
-        ctx.LogImportWarning($"{nameof(QuantumEditorSettings)} hasn't been created yet");
-        return;
-      }
-
-      var rootFolder = editorSettings.GetAssetLookupRoot();
+      var rootFolder = QuantumUnityDBUtilities.GetAssetLookupRoot();
       
       var db = ScriptableObject.CreateInstance<QuantumUnityDB>();
       

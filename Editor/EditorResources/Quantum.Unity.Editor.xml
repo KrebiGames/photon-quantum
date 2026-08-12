@@ -118,6 +118,13 @@
             <param name="assetPath"></param>
             <returns></returns>
         </member>
+        <member name="M:Quantum.Editor.QuantumUnityDBUtilities.IsInAssetSearchPaths(System.String)">
+            <summary>
+            Test if an asset path is in the asset search paths (<see cref="!:QuantumEditorProjectSettings.AssetSearchPaths"/>).
+            </summary>
+            <param name="path">Path to check</param>
+            <returns>True if the path is inside the configured search path</returns>
+        </member>
         <member name="F:Quantum.Editor.QuantumTerrainImporter.TerrainData">
             <summary>
             Source terrain data.
@@ -149,7 +156,13 @@
         <member name="T:Quantum.Editor.QuantumEditorToolbarUtilities">
             <summary>
             An editor script that places a drop down selection to quickly load Unity scenes, which are listed in the BuildSettings.
-            To disabled the toolbar toggle <see cref="F:Quantum.QuantumEditorSettings.UseQuantumToolbarUtilities"/>.
+            To disabled the toolbar toggle <see cref="F:Quantum.Editor.QuantumEditorSettings.UseQuantumToolbarUtilities"/>.
+            </summary>
+        </member>
+        <member name="T:Quantum.Editor.QuantumTerrainColliderPostprocessor">
+            <summary>
+            Refreshes the scene view terrain collider gizmos when a terrain collider asset (.qterrain) is
+            (re)baked through its scripted importer
             </summary>
         </member>
         <member name="T:Quantum.Editor.QuantumStateInspector">
@@ -262,6 +275,16 @@
             Utility methods for working with Unity's <see cref="T:UnityEditor.AssetDatabase"/>
             </summary>
         </member>
+        <member name="M:Quantum.Editor.AssetDatabaseUtils.FoldSceneObjectId(UnityEditor.GlobalObjectId)">
+            <summary>
+            Folds a scene object <see cref="T:UnityEditor.GlobalObjectId"/> into the value it has after prefab instances are
+            baked into plain scene objects (play mode entry, builds): the baked fileID becomes
+            sourceFileID ^ prefabInstanceFileID with targetPrefabId dropping to 0, so folded ids compare equal
+            across edit mode, play mode and builds. Returns 0 for ids that are not scene objects.
+            Mirrors undocumented native behavior, verified on 2021.3 through 6000.5.
+            Keep in sync with the copy in QuantumMapDataBaker.
+            </summary>
+        </member>
         <member name="M:Quantum.Editor.AssetDatabaseUtils.AddAddressableAssetsWithLabelMonitor(System.String,System.Action{UnityEngine.Hash128})">
             <summary>
             Register a handler that will be called when an addressable asset with a specific label is added or removed.
@@ -317,6 +340,12 @@
         <member name="M:Quantum.Editor.AssetDatabaseUtils.GetGUIDAndLocalFileIdentifierOrThrow(System.Int32)">
             <summary>
             Gets the GUID and local file identifier for the instance ID or throws an exception if the asset is not found.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.AssetDatabaseUtils.LoadAsset(UnityEditor.GUID,System.Int64)">
+            <summary>
+            Loads the asset identified by <paramref name="guid"/> and <paramref name="fileId"/>, or returns <see langword="null"/>
+            if no such asset exists.
             </summary>
         </member>
         <member name="M:Quantum.Editor.AssetDatabaseUtils.MoveAssetOrThrow(System.String,System.String)">
@@ -710,7 +739,7 @@
         </member>
         <member name="M:Quantum.Editor.QuantumEditorMenuCreateScene.CreateAndSaveNewQuantumScene">
             <summary>
-            Create and save a new empty Quantum game scene and Quantum map asset inside <see cref="F:Quantum.QuantumEditorSettings.DefaultNewAssetsLocation"/>.
+            Create and save a new empty Quantum game scene and Quantum map asset inside <see cref="P:Quantum.Editor.QuantumEditorSettings.DefaultNewAssetsLocation"/>.
             </summary>
         </member>
         <member name="M:Quantum.Editor.QuantumEditorMenuCreateScene.CreateNewQuantumScene(System.String,System.String,System.Boolean,System.Boolean,System.Boolean)">
@@ -744,7 +773,7 @@
             <summary>
             Setup a new Quantum scene and save the Map asset at the propsed path.
             </summary>
-            <param name="mapAssetPath">Map asset folder or path, can be null to store under <see cref="F:Quantum.QuantumEditorSettings.DefaultNewAssetsLocation"/></param>
+            <param name="mapAssetPath">Map asset folder or path, can be null to store under <see cref="P:Quantum.Editor.QuantumEditorSettings.DefaultNewAssetsLocation"/></param>
             <param name="runtimeConfig">Runtime Config to assign to the debug runner, can be null</param>
         </member>
         <member name="M:Quantum.Editor.QuantumEditorMenuCreateScene.AddCurrentSceneToSettings">
@@ -860,11 +889,6 @@
             Template to add user code to <see cref="T:Quantum.SimulationConfig"/>.
             </summary>
         </member>
-        <member name="P:Quantum.Editor.QuantumEditorUserScriptGeneration.TemplateUserCodeGenSettings">
-            <summary>
-            Template to add user code to <see cref="T:Quantum.Editor.QuantumCodeGenSettings"/>.
-            </summary>
-        </member>
         <member name="M:Quantum.Editor.QuantumEditorUserScriptGeneration.GenerateUserFiles">
             <summary>
             Generate user files.
@@ -883,6 +907,146 @@
         <member name="M:Quantum.Editor.QuantumEditorMenuLookUpTables.Generate">
             <summary>
             Generate the math lookup tables.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.DefaultPath">
+            <summary>
+            The default path of the global Quantum editor settings asset.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorSettings.Get``1(System.Func{Quantum.Editor.QuantumEditorSettings,``0})">
+            <summary>
+            Get the global Quantum editor settings instance and run the provided action and return result of a certain type.
+            </summary>
+            <typeparam name="T">Type to return</typeparam>
+            <param name="check">The func to run on the settings.</param>
+            <returns>Returns the result of the func or default T</returns>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorSettings.Get``1(System.Func{Quantum.Editor.QuantumEditorSettings,``0},``0)">
+            <summary>
+            Get the global Quantum editor settings instance and run the provided action and return result of a certain type.
+            </summary>
+            <typeparam name="T">Type to return</typeparam>
+            <param name="check">The func to run on the settings.</param>
+            <param name="defaultValue">Return this when the settings have not been found.</param>
+            <returns>Returns the result of the func</returns>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorSettings.TryGetGlobal(Quantum.Editor.QuantumEditorSettings@)">
+            <summary/>
+        </member>
+        <member name="P:Quantum.Editor.QuantumEditorSettings.Global">
+            <summary/>
+        </member>
+        <member name="P:Quantum.Editor.QuantumEditorSettings.DefaultNewAssetsLocation">
+            <summary>
+            Where to create new Quantum assets by default.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.SdkRoot">
+            <summary>
+            Location where Quantum is installed.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.AssetSearchPaths">
+            <summary>
+            Locations that the QuantumUnityDB discovers Quantum assets.
+            Changing this requires reimporting all Unity (Quantum) assets manually.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.NewAssetsLocation">
+            <summary>
+            Where to create new Quantum assets by default.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.BakeCacheRoot">
+            <summary>
+            Default location of the bake cache folder.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.AutoBuildOnSceneSave">
+            <summary>
+            Automatically trigger bake on saving a scene.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.AutoBuildOnPlaymodeChanged">
+            <summary>
+            If set MapData will be automatically baked on entering play mode, on saving a scene and on building a player.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.AutoBuildOnBuild">
+            <summary>
+            If set MapData will be automatically baked on building, on saving a scene and on building a player.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.AssetGuidOverrides">
+            <summary>
+            A list of Quantum assets that enabled GUID Override. This list is tracked automatically.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.UseQuantumUnityDBAssetPostprocessor">
+            <summary>
+            The post processor enables duplicating Quantum assets and prefabs and make sure a new GUID and correct path are set. This can make especially batched processes slow and can be toggled off here.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.UseQuantumToolbarUtilities">
+            <summary>
+            If enabled a scene loading dropdown is displayed next to the play button.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.QuantumToolbarZone">
+            <summary>
+            Where to display the toolbar. Requires a domain reload after change.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.UsePhotonAppVersionsPostprocessor">
+            <summary>
+            If enabled a local PhotonPrivateAppVersion scriptable object is created to support the demo menu scene.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEditorSettings.EntityComponentInspectorMode">
+            <summary>
+            If enabled entity components are displayed inside of EntityPrototype inspector
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorSettings.RemoveOutdatedGuidOverrides">
+            <summary>
+            Drops <see cref="F:Quantum.Editor.QuantumEditorSettings.AssetGuidOverrides"/> entries whose Unity GUID no longer resolves to an asset, then
+            rebuilds the lookup dictionary. Returns the number of removed entries.
+            </summary>
+        </member>
+        <member name="T:Quantum.Editor.QuantumToolbarZone">
+            <summary>
+            The toolbar zone to display the Quantum toolbar.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumToolbarZone.ToolbarZoneRightAlign">
+            <summary>
+            Show toolbar on the right side of the play button.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumToolbarZone.ToolbarZoneLeftAlign">
+            <summary>
+            Show the toolbar on the left side of the play button.
+            </summary>
+        </member>
+        <member name="T:Quantum.Editor.QuantumEntityComponentInspectorMode">
+            <summary>
+            Entity component inspector mode.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEntityComponentInspectorMode.ShowMonoBehaviours">
+            <summary>
+            Show the mono behaviours.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEntityComponentInspectorMode.InlineInEntityPrototypeAndShowMonoBehavioursStubs">
+            <summary>
+            Inline entity prototype and show mono behaviours as stubs.
+            </summary>
+        </member>
+        <member name="F:Quantum.Editor.QuantumEntityComponentInspectorMode.InlineInEntityPrototypeAndHideMonoBehaviours">
+            <summary>
+            Inline entity prototype and hide mono behaviours.
             </summary>
         </member>
         <member name="T:Quantum.Editor.QuantumEditorSessionShutdown">
@@ -1126,7 +1290,7 @@
             that lose the script guids this way.
             </summary>
         </member>
-        <member name="F:Quantum.Editor.QuantumEditorMenuDllToggle.ExtractToDirectory">
+        <member name="P:Quantum.Editor.QuantumEditorMenuDllToggle.ExtractToDirectory">
             <summary>
             Directory where the Quantum Dlls (Debug or Release) are extracted to.
             </summary>
@@ -1160,7 +1324,7 @@
         </member>
         <member name="M:Quantum.Editor.QuantumEditorMenuDllToggle.SetToDebug">
             <summary>
-            Extracts the Debug versions of Quantum DLLs in the <see cref="F:Quantum.Editor.QuantumEditorMenuDllToggle.ExtractToDirectory">specified directory</see>.
+            Extracts the Debug versions of Quantum DLLs in the <see cref="P:Quantum.Editor.QuantumEditorMenuDllToggle.ExtractToDirectory">specified directory</see>.
             </summary>
         </member>
         <member name="M:Quantum.Editor.QuantumEditorMenuDllToggle.SetToReleaseCheck">
@@ -1182,7 +1346,7 @@
         </member>
         <member name="M:Quantum.Editor.QuantumEditorMenuDllToggle.SetToRelease">
             <summary>
-            Extracts the Release versions of Quantum DLLs in the <see cref="F:Quantum.Editor.QuantumEditorMenuDllToggle.ExtractToDirectory">specified directory</see>.
+            Extracts the Release versions of Quantum DLLs in the <see cref="P:Quantum.Editor.QuantumEditorMenuDllToggle.ExtractToDirectory">specified directory</see>.
             </summary>
         </member>
         <member name="M:Quantum.Editor.QuantumEditorHubWindowSdk.Open">
@@ -1208,11 +1372,6 @@
         <member name="M:Quantum.Editor.QuantumEditorShortcutsWindow.SearchPhotonServerSettings">
             <summary>
             Search and select PhotonServerSettings.
-            </summary>
-        </member>
-        <member name="M:Quantum.Editor.QuantumEditorShortcutsWindow.SearchQuantumEditorSettings">
-            <summary>
-            Search and select QuantumEditorSettings.
             </summary>
         </member>
         <member name="M:Quantum.Editor.QuantumEditorShortcutsWindow.SearchQuantumGizmoSettings">
@@ -1832,156 +1991,9 @@
             <param name="includes">The list of files to add to the Includes list of the project file</param>
             <param name="defines">The defines</param>
         </member>
-        <member name="F:Quantum.Editor.QuantumMapImporter.DefaultBakeCacheRoot">
-            <summary>
-            Default location of the bake cache folder, used when <see cref="M:Quantum.Editor.QuantumMapImporter.OverrideBakeCacheRoot(System.String@)"/> is not implemented or leaves the value unchanged.
-            </summary>
-        </member>
-        <member name="P:Quantum.Editor.QuantumMapImporter.BakeCacheRoot">
-            <summary>
-            Project-relative folder under which baked <c>.qmapdata</c> and <c>.qnavdata</c> files are written.
-            Resolves to <see cref="F:Quantum.Editor.QuantumMapImporter.DefaultBakeCacheRoot"/> unless a partial implementation of <see cref="M:Quantum.Editor.QuantumMapImporter.OverrideBakeCacheRoot(System.String@)"/> assigns a different path.
-            </summary>
-        </member>
         <member name="T:Quantum.QuantumDefaultConfigsAssetPostprocessor">
             <summary>
             A Unity asset post processor that makes use to generate default Quantum configs in the user folder.
-            </summary>
-        </member>
-        <member name="T:Quantum.QuantumEditorSettings">
-            <summary>
-            Contains global Quantum editor settings.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.DefaultPath">
-            <summary>
-            The default path of the global Quantum editor settings asset.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumEditorSettings.Get``1(System.Func{Quantum.QuantumEditorSettings,``0})">
-            <summary>
-            Get the global Quantum editor settings instance and run the provided action and return result of a certain type.
-            </summary>
-            <typeparam name="T">Type to return</typeparam>
-            <param name="check">The func to run on the settings.</param>
-            <returns>Returns the result of the func or default T</returns>
-        </member>
-        <member name="M:Quantum.QuantumEditorSettings.Get``1(System.Func{Quantum.QuantumEditorSettings,``0},``0)">
-            <summary>
-            Get the global Quantum editor settings instance and run the provided action and return result of a certain type.
-            </summary>
-            <typeparam name="T">Type to return</typeparam>
-            <param name="check">The func to run on the settings.</param>
-            <param name="defaultValue">Return this when the settings have not been found.</param>
-            <returns>Returns the result of the func</returns>
-        </member>
-        <member name="M:Quantum.QuantumEditorSettings.IsInAssetSearchPaths(System.String)">
-            <summary>
-            Test if an asset path is in the asset search paths (<see cref="F:Quantum.QuantumEditorSettings.AssetSearchPaths"/>).
-            </summary>
-            <param name="path">Path to check</param>
-            <returns>True if the path is inside the configured search path</returns>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.AssetSearchPaths">
-            <summary>
-            Locations that the QuantumUnityDB discovers Quantum assets.
-            Changing this requires reimporting all Unity (Quantum) assets manually.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.DefaultNewAssetsLocation">
-            <summary>
-            Where to create new Quantum assets by default.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.UseQuantumUnityDBAssetPostprocessor">
-            <summary>
-            The post processor enables duplicating Quantum assets and prefabs and make sure a new GUID and correct path are set. This can make especially batched processes slow and can be toggled off here.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.UseQuantumToolbarUtilities">
-            <summary>
-            If enabled a scene loading dropdown is displayed next to the play button.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.QuantumToolbarZone">
-            <summary>
-            Where to display the toolbar. Requires a domain reload after change.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.UsePhotonAppVersionsPostprocessor">
-            <summary>
-            If enabled a local PhotonPrivateAppVersion scriptable object is created to support the demo menu scene.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.EntityComponentInspectorMode">
-            <summary>
-            If enabled entity components are displayed inside of EntityPrototype inspector
-            </summary>
-        </member>
-        <member name="P:Quantum.QuantumEditorSettings.FPDisplayPrecision">
-            <summary>
-            Obsolete.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.AutoBuildOnSceneSave">
-            <summary>
-            Automatically trigger bake on saving a scene.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.AutoBuildOnPlaymodeChanged">
-            <summary>
-            If set MapData will be automatically baked on entering play mode, on saving a scene and on building a player.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.AutoBuildOnBuild">
-            <summary>
-            If set MapData will be automatically baked on building, on saving a scene and on building a player.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEditorSettings.AssetGuidOverrides">
-            <summary>
-            A list of Quantum assets that enabled GUID Override. This list is tracked automatically.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumEditorSettings.RemoveOutdatedGuidOverrides">
-            <summary>
-            Removes outdated entries in Asset Guid overrides.
-            </summary>
-            <returns></returns>
-        </member>
-        <member name="T:Quantum.QuantumToolbarZone">
-            <summary>
-            The toolbar zone to display the Quantum toolbar.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumToolbarZone.ToolbarZoneRightAlign">
-            <summary>
-            Show toolbar on the right side of the play button.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumToolbarZone.ToolbarZoneLeftAlign">
-            <summary>
-            Show the toolbar on the left side of the play button.
-            </summary>
-        </member>
-        <member name="T:Quantum.QuantumEntityComponentInspectorMode">
-            <summary>
-            Entity component inspector mode.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEntityComponentInspectorMode.ShowMonoBehaviours">
-            <summary>
-            Show the mono behaviours.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEntityComponentInspectorMode.InlineInEntityPrototypeAndShowMonoBehavioursStubs">
-            <summary>
-            Inline entity prototype and show mono behaviours as stubs.
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumEntityComponentInspectorMode.InlineInEntityPrototypeAndHideMonoBehaviours">
-            <summary>
-            Inline entity prototype and hide mono behaviours.
             </summary>
         </member>
     </members>

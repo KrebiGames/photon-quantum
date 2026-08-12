@@ -39,11 +39,6 @@ namespace Quantum {
     [InlineHelp] 
     public FP Height;
     /// <summary>
-    /// Additional static collider settings.
-    /// </summary>
-    [InlineHelp, DrawInline, Space]
-    public QuantumStaticColliderSettings Settings = new QuantumStaticColliderSettings();
-    /// <summary>
     /// Should the <see cref="Vertices"/> be set from the source collider during baking.
     /// </summary>
     protected virtual bool UpdateVerticesFromSourceOnBake => true;

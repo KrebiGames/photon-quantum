@@ -12,6 +12,7 @@ Shader "Unlit/Quantum Debug"
             "Queue" = "Transparent"
             "IgnoreProjector" = "True"
             "RenderType" = "Transparent"
+            "RenderPipeline" = "UniversalPipeline"
         }
 
         ZTest Always

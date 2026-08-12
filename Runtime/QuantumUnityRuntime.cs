@@ -684,6 +684,7 @@ namespace Quantum {
     IPrototype Convert(QuantumEntityPrototypeConverter converter);
   }
 
+  [Serializable]
   public abstract class QuantumUnityPrototypeAdapter<PrototypeType> 
 #if QUANTUM_ENABLE_MIGRATION
 #pragma warning disable CS0618
@@ -1816,6 +1817,7 @@ namespace Quantum {
   using Object = UnityEngine.Object;
   
   internal sealed class QuantumUnityStaticDispatcherAdapterWorker : QuantumMonoBehaviour {
+    [NonSerialized]
     public DispatcherBase Dispatcher;
 
     private void LateUpdate() {
@@ -2491,11 +2493,15 @@ namespace Quantum {
   }
   
   /// <summary/>
+  public delegate AssetGuid QuantumGetMapNestedAssetRefDelegate(Type assetType, string assetName);
+  
+  /// <summary/>
   public sealed class QuantumEntityPrototypeBakeContext : IDisposable {
     public readonly List<ComponentPrototype> Prototypes = ListPool<ComponentPrototype>.Get();
     public readonly QuantumEntityPrototypeConverter Converter;
     public AssetRef<EntityView> SelfViewAsset;
-      
+    readonly QuantumGetMapNestedAssetRefDelegate _getAssetRef;
+
     public void Add(ComponentPrototype prototype) {
       Prototypes.Add(prototype);
     }
@@ -2507,10 +2513,14 @@ namespace Quantum {
       return result;
     }
 
-    public QuantumEntityPrototypeBakeContext(QuantumEntityPrototypeConverter converter) {
+    public QuantumEntityPrototypeBakeContext(QuantumEntityPrototypeConverter converter, QuantumGetMapNestedAssetRefDelegate assetRefDelegate = null) {
       Converter = converter;
+      _getAssetRef = assetRefDelegate;
     }
-      
+
+    public AssetRef<T> GetMapNestedAssetRef<T>(string name) where T : AssetObject {
+      return _getAssetRef(typeof(T), name);
+    }
 
     public void Dispose() {
       ListPool<ComponentPrototype>.Release(Prototypes);
@@ -3940,6 +3950,8 @@ namespace Quantum {
 
       HingeJoint2D = 5,
       HingeJoint3D = 6,
+
+      CharacterJoint3D = 8,
     }
 
     public GizmosJointType Type;
@@ -3960,6 +3972,14 @@ namespace Quantum {
     public bool UseAngleLimits;
     public float LowerAngle;
     public float UpperAngle;
+
+    public Vector3 TwistAxis;
+    public Vector3 SwingAxis;
+
+    public float LowerTwistAngle;
+    public float UpperTwistAngle;
+    public float Swing1Angle;
+    public float Swing2Angle;
   }
 
   internal class UserGizmoCallback {
@@ -4054,6 +4074,36 @@ namespace Quantum {
       GameContext.Clear();
     }
 
+    /// <summary>
+    /// Invalidates the cached gizmo data for any static terrain collider backed by the given asset, so
+    /// that it is recomputed from the current heightmap on the next scene view repaint. Use this when a
+    /// terrain collider asset has been (re)baked outside of a full map bake (e.g. a .qterrain reimport).
+    /// </summary>
+    /// <param name="asset">The terrain collider asset that was (re)baked.</param>
+    /// <returns><see langword="true"/> if at least one cached entry was invalidated; otherwise <see langword="false"/>.</returns>
+    public static bool InvalidateStaticMeshGizmo(Quantum.TerrainCollider asset) {
+      if (asset == null) {
+        return false;
+      }
+
+      List<object> staleKeys = null;
+      foreach (var key in _meshGizmoData.Keys) {
+        if (key is QuantumStaticTerrainCollider3D terrainCollider && terrainCollider.Asset == asset) {
+          (staleKeys ??= new List<object>()).Add(key);
+        }
+      }
+
+      if (staleKeys == null) {
+        return false;
+      }
+
+      foreach (var key in staleKeys) {
+        _meshGizmoData.Remove(key);
+      }
+
+      return true;
+    }
+
     private static bool ShouldDraw(QuantumGizmoEntry entry, bool selected, bool hasStateDrawer = true) {
       if (entry.Enabled == false)
         return false;
@@ -4094,7 +4144,7 @@ namespace Quantum {
 
     [DrawGizmo(GizmoType.Selected | GizmoType.Active | GizmoType.NonSelected)]
     static void DrawGizmos(QuantumRunnerBehaviour behaviour, GizmoType gizmoType) {
-      if (behaviour.Runner == null || behaviour.Runner.Session == null) {
+      if (behaviour.Runner == null || behaviour.Runner.Session == null || QuantumRunner.FindRunner(behaviour.Runner.Id) == false) {
         return;
       }
 
@@ -4160,6 +4210,13 @@ namespace Quantum {
         }
       }
 #endif
+    }
+
+    static Vector3 RotateAroundAxis(Vector3 v, Vector3 axis, float degrees) {
+      float rad = degrees * Mathf.Deg2Rad;
+      axis = axis.normalized;
+
+      return v * Mathf.Cos(rad) + Vector3.Cross(axis, v) * Mathf.Sin(rad) + axis * Vector3.Dot(axis, v) * (1 - Mathf.Cos(rad));
     }
 
     // shared between 2d and 3d
@@ -4301,6 +4358,64 @@ namespace Quantum {
           Gizmos.color = Handles.color = Color.white;
 
           break;
+        }
+        case QuantumGizmosJointInfo.GizmosJointType.CharacterJoint3D: {
+
+            var twist = p.JointRot * p.TwistAxis;
+            var swing1 = p.JointRot * p.SwingAxis;
+            var swing2 = Vector3.Cross(p.TwistAxis, p.SwingAxis);
+
+            var twistAxis = Vector3.Cross(twist, swing1);
+            var swing1Axis = Quaternion.AngleAxis(-p.UpperTwistAngle + ((p.UpperTwistAngle - p.LowerTwistAngle) / 2), twist) * twistAxis;
+            var swing2Axis = -Vector3.Cross(twist, swing1Axis);
+
+            Gizmos.color = Color.red;
+            Gizmos.color = Color.green;
+            Gizmos.color = Color.blue;
+
+            {
+              var angle = p.UpperTwistAngle - p.LowerTwistAngle;
+              var twistAxisOffset = Quaternion.AngleAxis(-p.UpperTwistAngle, twist) * twistAxis;
+
+              GizmoUtils.DrawGizmoArc(p.AnchorPos, twist, twistAxisOffset, angle, 0.5f, Color.red, 1f, QuantumGizmoStyle.FillDisabled);
+
+              var cross = Vector3.Cross(twistAxisOffset, twist);
+              var a = Quaternion.AngleAxis(p.Swing1Angle, cross) * twistAxisOffset;
+              var b = Quaternion.AngleAxis(-p.Swing1Angle, cross) * twistAxisOffset;
+
+              var color = new Color(1f, 0.5f, 0.5f, 0.1f);
+              GizmoUtils.DrawGizmoArc(p.AnchorPos, twist, a, angle, 0.5f, color);
+              GizmoUtils.DrawGizmoArc(p.AnchorPos, twist, b, angle, 0.5f, color);
+            }
+
+            // the sin must be used in the from vector direction
+            {
+
+              var swing1AxisOffset = Quaternion.AngleAxis(-p.Swing1Angle, swing2Axis) * swing1Axis;
+              GizmoUtils.DrawGizmoArc(p.AnchorPos, swing2Axis, swing1AxisOffset, p.Swing1Angle * 2, 0.5f, Color.green, 1f, QuantumGizmoStyle.FillDisabled);
+
+              var cross = Vector3.Cross(swing1Axis, swing2Axis);
+              var angle = p.UpperTwistAngle - p.LowerTwistAngle;
+
+              var a = Quaternion.AngleAxis(angle/2, cross) * swing1AxisOffset;
+              var aNormal = Quaternion.AngleAxis(angle/2, cross) * swing2Axis;
+
+              var b = Quaternion.AngleAxis(-angle / 2, cross) * swing1AxisOffset;
+              var bNormal = Quaternion.AngleAxis(-angle / 2, cross) * swing2Axis;
+
+              var color = new Color(0.5f, 1f, 0.5f, 0.1f);
+              GizmoUtils.DrawGizmoArc(p.AnchorPos, aNormal, a, p.Swing1Angle * 2, 0.5f, color);
+              GizmoUtils.DrawGizmoArc(p.AnchorPos, bNormal, b, p.Swing1Angle * 2, 0.5f, color);
+            }
+
+            {
+              var swing2AxisOffset = Quaternion.AngleAxis(-p.Swing2Angle, swing1Axis) * swing2Axis;
+              var color = new Color(0.5f, 0.5f, 1f, 0.1f);
+              GizmoUtils.DrawGizmoArc(p.AnchorPos, swing1Axis, swing2AxisOffset, p.Swing2Angle * 2, 0.5f, color);
+              GizmoUtils.DrawGizmoArc(p.AnchorPos, swing1Axis, swing2AxisOffset, p.Swing2Angle * 2, 0.5f, Color.blue, 1f, QuantumGizmoStyle.FillDisabled);
+            }
+
+            break;
         }
       }
     }
@@ -4613,9 +4728,9 @@ namespace Quantum {
 
 namespace Quantum {
 #if UNITY_EDITOR
+  using Photon.Deterministic;
   using System;
   using System.Collections.Generic;
-  using Photon.Deterministic;
   using UnityEditor;
   using UnityEngine;
 
@@ -6150,7 +6265,7 @@ namespace Quantum {
           return;
         }
 
-        QuantumGizmosJointInfo info;
+        QuantumGizmosJointInfo info = new QuantumGizmosJointInfo();
 
         switch (prototype.JointType) {
           case JointType.DistanceJoint:
@@ -6213,17 +6328,20 @@ namespace Quantum {
 
 namespace Quantum {
 #if UNITY_EDITOR && QUANTUM_ENABLE_PHYSICS3D && !QUANTUM_DISABLE_PHYSICS3D
-  using System;
   using Photon.Deterministic;
   using Physics3D;
+  using System;
   using UnityEditor;
   using UnityEngine;
 
   public partial class QuantumGameGizmos {
     private static StaticMeshColliderGizmoData GetOrCreateGizmoData(object behaviour) {
       if (!_meshGizmoData.TryGetValue(behaviour, out var data)) {
-        data = new StaticMeshColliderGizmoData();
         CreateStaticMeshData(behaviour);
+
+        if (!_meshGizmoData.TryGetValue(behaviour, out data)) {
+          data = new StaticMeshColliderGizmoData();
+        }
       }
 
       return data;
@@ -6240,14 +6358,14 @@ namespace Quantum {
           meshTriangles = collider3D.CreateMeshTriangles();
           break;
         case QuantumStaticTerrainCollider3D terrainCollider3D:
-          meshTriangles = terrainCollider3D.Asset.CreateMeshTriangles(terrainCollider3D.transform.position.ToFPVector3(), -1);
+          meshTriangles = terrainCollider3D.GetQHeightMap()?.CreateMeshTriangles(terrainCollider3D.transform.position.ToFPVector3(), -1);
           break;
         case MeshUnmanagedTrianglesRef unmanagedTrianglesRef:
           meshTriangles = MeshUnmanagedTrianglesRef.ToManagedTriangles(unmanagedTrianglesRef);
           break;
       }
 
-      if (meshTriangles is { Triangles: null }) {
+      if (meshTriangles == null || meshTriangles.Triangles == null) {
         return;
       }
 
@@ -6437,7 +6555,7 @@ namespace Quantum {
           return;
         }
 
-        QuantumGizmosJointInfo info;
+        QuantumGizmosJointInfo info = new QuantumGizmosJointInfo();
 
         switch (prototype.JointType) {
           case JointType3D.DistanceJoint:
@@ -6453,6 +6571,16 @@ namespace Quantum {
           case JointType3D.HingeJoint:
             info.Type = QuantumGizmosJointInfo.GizmosJointType.HingeJoint3D;
             info.MinDistance = prototype.Distance.AsFloat;
+            break;
+
+          case JointType3D.CharacterJoint:
+            info.Type = QuantumGizmosJointInfo.GizmosJointType.CharacterJoint3D;
+            info.TwistAxis = prototype.TwistAxis.ToUnityVector3();
+            info.SwingAxis = prototype.SwingAxis.ToUnityVector3();
+            info.LowerTwistAngle = prototype.TwistLowerAngle.AsFloat;
+            info.UpperTwistAngle = prototype.TwistUpperAngle.AsFloat;
+            info.Swing1Angle = prototype.Swing1AngleLimits.HasValue ? prototype.Swing1AngleLimits.Value.AsFloat : 0;
+            info.Swing2Angle = prototype.Swing2AngleLimits.HasValue ? prototype.Swing2AngleLimits.Value.AsFloat : 0;
             break;
 
           default:
@@ -6516,6 +6644,16 @@ namespace Quantum {
           param.UseAngleLimits = joint->HingeJoint.UseAngleLimits;
           param.LowerAngle = (joint->HingeJoint.LowerLimitRad * FP.Rad2Deg).AsFloat;
           param.UpperAngle = (joint->HingeJoint.UpperLimitRad * FP.Rad2Deg).AsFloat;
+          break;
+
+        case JointType3D.CharacterJoint:
+          param.Type = QuantumGizmosJointInfo.GizmosJointType.CharacterJoint3D;
+          param.TwistAxis = joint->CharacterJoint.TwistAxis.ToUnityVector3();
+          param.SwingAxis = joint->CharacterJoint.Swing1Axis.ToUnityVector3();
+          param.LowerTwistAngle = (joint->CharacterJoint.TwistLowLimitRad * FP.Rad2Deg).AsFloat;
+          param.UpperTwistAngle = (joint->CharacterJoint.TwistHighLimitRad * FP.Rad2Deg).AsFloat;
+          param.Swing1Angle = (joint->CharacterJoint.Swing1LimitRad * FP.Rad2Deg).AsFloat;
+          param.Swing2Angle = (joint->CharacterJoint.Swing2LimitRad * FP.Rad2Deg).AsFloat;
           break;
       }
 
@@ -6904,7 +7042,7 @@ namespace Quantum {
     public Type AssetType => SerializableAssetType;
   }
   
-#if !QUANTUM_DISABLE_ASSET_BUNDLE_ASSET_SOURCE
+#if QUANTUM_ENABLE_ASSET_BUNDLE_ASSET_SOURCE && !QUANTUM_DISABLE_ASSET_BUNDLE_ASSET_SOURCE
   [Serializable]
   public class QuantumAssetObjectSourceAssetBundle: QuantumAssetSourceAssetBundle<Quantum.AssetObject>, IQuantumAssetObjectSource {
     public SerializableType<Quantum.AssetObject> SerializableAssetType;
@@ -6929,6 +7067,64 @@ namespace Quantum {
     public Type AssetType => SerializableAssetType;
   }
 #endif
+}
+
+#endregion
+
+
+#region Assets/Photon/Quantum/Runtime/IQuantumNavMeshSource.cs
+
+namespace Quantum {
+  using System;
+  using System.Collections.Generic;
+  using UnityEngine;
+
+  /// <summary>
+  /// Implement this in a MonoBehaviour to turn a script into a navmesh bake data source.
+  /// </summary>
+  public interface IQuantumNavMeshSource {
+    public void GetNavMeshes(QuantumNavMeshBakeContext context);
+  }
+
+
+  /// <summary/>
+  public delegate AssetObject QuantumCreateMapNestedAssetDelegate(Type assetType, string assetName);
+  
+  /// <summary/>
+  public sealed class QuantumNavMeshBakeContext : IDisposable {
+    readonly bool _importFromUnity;
+    readonly List<NavMeshBakeData> _bakeData = new();
+    readonly List<(AssetObject, string)> _additionalAssets = new();
+
+    
+    public IReadOnlyList<NavMeshBakeData> BakeData => _bakeData;
+    public IReadOnlyList<(AssetObject, string)> AdditionalAssets => _additionalAssets;
+    public bool ImportFromUnity => _importFromUnity;
+    QuantumCreateMapNestedAssetDelegate _createAssetDelegate;
+      
+    /// <summary>
+    /// One-to-one mapping of <see cref="BakeData"/> entries to the source that added them.
+    /// </summary>
+    public readonly List<IQuantumNavMeshSource> Sources = new();
+
+    public QuantumNavMeshBakeContext(QuantumCreateMapNestedAssetDelegate callback, bool importFromUnity) {
+      _createAssetDelegate = callback;
+      _importFromUnity = importFromUnity;
+    }
+    
+    public void Add(NavMeshBakeData bakeData) {
+      _bakeData.Add(bakeData);
+    }
+
+    public T GetOrCreateMapNestedAsset<T>(string name) where T : AssetObject {
+      var asset = _createAssetDelegate?.Invoke(typeof(T), name);
+      _additionalAssets.Add((asset, name));
+      return (T)asset;
+    }
+
+    public void Dispose() {
+    }
+  }
 }
 
 #endregion
@@ -7202,6 +7398,13 @@ namespace Quantum {
     /// </summary>
     /// <param name="data">The MapData object that is currently baked.</param>
     public virtual void OnBakeNavMesh(QuantumMapData data) { }
+
+    /// <summary>
+    /// Is called after terrain colliders in the given scene are baked.
+    /// </summary>
+    /// <param name="data">The MapData object that is currently baked.</param>
+    /// <param name="terrainColliders">List of baked terrain colliders.</param>
+    public virtual void OnBakeTerrains(QuantumMapData data, List<Quantum.QuantumStaticTerrainCollider3D> terrainColliders) { }
   }
 
   /// <summary>
@@ -7217,9 +7420,11 @@ namespace Quantum {
     [Obsolete("Use BakeMapData instead")]
     Obsolete_BakeMapData = 1 << 0,
     /// <summary>
-    /// Bake <see cref="QuantumMapDataBakeFlags.BakeMapPrototypes"/> and <see cref="QuantumMapDataBakeFlags.BakeMapColliders"/>
+    /// Bake <see cref="QuantumMapDataBakeFlags.BakeMapPrototypes"/>,
+    /// <see cref="QuantumMapDataBakeFlags.BakeMapColliders"/> and
+    /// <see cref="QuantumMapDataBakeFlags.BakeMapTerrains"/>
     /// </summary>
-    BakeMapData = BakeMapPrototypes | BakeMapColliders,
+    BakeMapData = BakeMapPrototypes | BakeMapColliders | BakeMapTerrains,
     /// <summary>
     /// Bake map prototypes
     /// </summary>
@@ -7228,6 +7433,10 @@ namespace Quantum {
     /// Bake map colliders
     /// </summary>
     BakeMapColliders = 1 << 6,
+    /// <summary>
+    /// Bake Terrain Collider assets.
+    /// </summary>
+    BakeMapTerrains = 1 << 9,
     /// <summary>
     /// Bake the Unity navmesh
     /// </summary>
@@ -7410,70 +7619,112 @@ namespace Quantum.Prototypes.Unity {
   [System.SerializableAttribute()]
   [Quantum.Prototypes.PrototypeAttribute(typeof(Quantum.Physics3D.Joint3D))]
   public class Joint3DConfig : Quantum.QuantumUnityPrototypeAdapter<Quantum.Prototypes.Joint3DConfig> {
-    [Quantum.DrawIfAttribute("JointType", 0, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Compare = (Quantum.CompareOperator)1, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.None, Compare = CompareOperator.NotEqual, Hide = true)]
     [UnityEngine.TooltipAttribute("If the joint should be materialized with Enabled set to false, not being considered by the Physics Engine.")]
     public System.Boolean StartDisabled;
+
     [Quantum.DisplayNameAttribute("Type")]
     [UnityEngine.TooltipAttribute("The type of the joint, implying which constraints are applied.")]
     public Quantum.Physics3D.JointType3D JointType;
-    [Quantum.DrawIfAttribute("JointType", 0, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Compare = (Quantum.CompareOperator)1, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.None, Compare = CompareOperator.NotEqual, Hide = true)]
     [UnityEngine.TooltipAttribute("A numerical tag that can be used to identify a joint or a group of joints.")]
     public System.Int32 UserTag;
-    [Quantum.DrawIfAttribute("JointType", 0, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Compare = (Quantum.CompareOperator)1, Hide = true)]
-    [UnityEngine.TooltipAttribute("A Map Entity that the joint might be connected to.\nThe entity must have at least a transform component.")]
+
     [Quantum.LocalReference]
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.None, Compare = CompareOperator.NotEqual, Hide = true)]
+    [UnityEngine.TooltipAttribute("A Map Entity that the joint might be connected to.\nThe entity must have at least a transform component.")]
     public Quantum.QuantumEntityPrototype ConnectedEntity;
-    [Quantum.DrawIfAttribute("JointType", 0, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Compare = (Quantum.CompareOperator)1, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.None, Compare = CompareOperator.NotEqual, Hide = true)]
     [UnityEngine.TooltipAttribute("The anchor point to which the joint connects to.\nIf a Connected Entity is provided, this represents an offset in its local space. Otherwise, the connected anchor is a position in world space.")]
     public Photon.Deterministic.FPVector3 ConnectedAnchor;
-    [Quantum.DrawIfAttribute("JointType", 0, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Compare = (Quantum.CompareOperator)1, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.None, Compare = CompareOperator.NotEqual, Hide = true)]
     [UnityEngine.TooltipAttribute("The anchor offset, in the local space of this joint entity's transform.\nThis is the point considered for the joint constraints and where the forces will be applied in the joint entity's body.")]
     public Photon.Deterministic.FPVector3 Anchor;
-    [Quantum.DrawIfAttribute("JointType", 3, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.HingeJoint, Hide = true)]
     [UnityEngine.TooltipAttribute("Axis around which the joint rotates, defined in the local space of the entity.\nThe vector is normalized before set. If zeroed, FPVector3.Right is used instead.")]
     public Photon.Deterministic.FPVector3 Axis;
-    [Quantum.DrawIfAttribute("JointType", 2, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.CharacterJoint, Hide = true)]
+    public Photon.Deterministic.FPVector3 TwistAxis;
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.CharacterJoint, Hide = true)]
+    public Photon.Deterministic.FPVector3 SwingAxis;
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.SpringJoint, Hide = true)]
     [UnityEngine.TooltipAttribute("The frequency in Hertz (Hz) at which the spring joint will attempt to oscillate.\nTypical values are below half the frequency of the simulation.")]
     public Photon.Deterministic.FP Frequency;
-    [Quantum.DrawIfAttribute("JointType", 2, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.SpringJoint, Hide = true)]
     [UnityEngine.TooltipAttribute("A dimensionless value representing the damper capacity of suppressing the spring oscillation, typically between 0 and 1.")]
     public Photon.Deterministic.FP DampingRatio;
-    [Quantum.DrawIfAttribute("JointType", 0, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Compare = (Quantum.CompareOperator)1, Hide = true)]
-    [Quantum.DrawIfAttribute("JointType", 3, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Compare = (Quantum.CompareOperator)1, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.None, Compare = CompareOperator.NotEqual, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.HingeJoint, Compare = CompareOperator.NotEqual, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.CharacterJoint, Compare = CompareOperator.NotEqual, Hide = true)]
     [UnityEngine.TooltipAttribute("Automatically configure the target Distance to be the current distance between the anchor points in the scene.")]
     public System.Boolean AutoConfigureDistance;
-    [Quantum.DrawIfAttribute("JointType", 2, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
-    [Quantum.DrawIfAttribute("AutoConfigureDistance", 0, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Mode = (Quantum.DrawIfMode)0)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.SpringJoint, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(AutoConfigureDistance), 0, Mode = DrawIfMode.ReadOnly)]
     [UnityEngine.TooltipAttribute("The distance between the anchor points that the joint will attempt to maintain.")]
     public Photon.Deterministic.FP Distance;
-    [Quantum.DrawIfAttribute("JointType", 1, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
-    [Quantum.DrawIfAttribute("AutoConfigureDistance", 0, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Mode = (Quantum.DrawIfMode)0)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.DistanceJoint, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(AutoConfigureDistance), 0, Mode = DrawIfMode.ReadOnly)]
     [UnityEngine.TooltipAttribute("The minimum distance between the anchor points that the joint will attempt to maintain.")]
     public Photon.Deterministic.FP MinDistance;
-    [Quantum.DrawIfAttribute("JointType", 1, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
-    [Quantum.DrawIfAttribute("AutoConfigureDistance", 0, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Mode = (Quantum.DrawIfMode)0)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.DistanceJoint, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(AutoConfigureDistance), 0, Mode = DrawIfMode.ReadOnly)]
     [UnityEngine.TooltipAttribute("The maximum distance between the anchor points that the joint will attempt to maintain.")]
     public Photon.Deterministic.FP MaxDistance;
-    [Quantum.DrawIfAttribute("JointType", 3, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.HingeJoint, Hide = true)]
     [UnityEngine.TooltipAttribute("If the relative angle between the joint transform and its connected anchor should be limited by the hinge joint.\nSet this checkbox to configure the lower and upper limiting angles.")]
     public System.Boolean UseAngleLimits;
-    [Quantum.DrawIfAttribute("UseAngleLimits", 1, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
-    [Quantum.DrawIfAttribute("JointType", 3, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(UseAngleLimits), 1, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.HingeJoint, Hide = true)]
     [UnityEngine.TooltipAttribute("The lower limiting angle of the allowed arc of rotation around the connected anchor, in degrees.")]
     public Photon.Deterministic.FP LowerAngle;
-    [Quantum.DrawIfAttribute("UseAngleLimits", 1, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
-    [Quantum.DrawIfAttribute("JointType", 3, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(UseAngleLimits), 1, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.HingeJoint, Hide = true)]
     [UnityEngine.TooltipAttribute("The upper limiting  angle of the allowed arc of rotation around the connected anchor, in degrees.")]
     public Photon.Deterministic.FP UpperAngle;
-    [Quantum.DrawIfAttribute("JointType", 3, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.CharacterJoint, Hide = true)]
+    public System.Boolean UseTwistAngleLimits = false;
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.CharacterJoint, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(UseTwistAngleLimits), 1, Hide = true)]
+    public Photon.Deterministic.FP TwistLowerAngle;
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.CharacterJoint, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(UseTwistAngleLimits), 1, Hide = true)]
+    public Photon.Deterministic.FP TwistUpperAngle;
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.CharacterJoint, Hide = true)]
+    public Photon.Deterministic.NullableFP Swing1AngleLimits;
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.CharacterJoint, Hide = true)]
+    public Photon.Deterministic.NullableFP Swing2AngleLimits;
+
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.HingeJoint, Hide = true)]
     [UnityEngine.TooltipAttribute("If the hinge joint uses a motor.\nSet this checkbox to configure the motor speed and max torque.")]
     public System.Boolean UseMotor;
-    [Quantum.DrawIfAttribute("UseMotor", 1, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
-    [Quantum.DrawIfAttribute("JointType", 3, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(UseMotor), 1, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.HingeJoint, Hide = true)]
     [UnityEngine.TooltipAttribute("The speed at which the hinge motor will attempt to rotate, in angles per second.")]
     public Photon.Deterministic.FP MotorSpeed;
-    [Quantum.DrawIfAttribute("UseMotor", 1, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
-    [Quantum.DrawIfAttribute("JointType", 3, (Quantum.CompareOperator)0, (Quantum.DrawIfMode)0, Hide = true)]
+
+    [Quantum.DrawIfAttribute(nameof(UseMotor), 1, Hide = true)]
+    [Quantum.DrawIfAttribute(nameof(JointType), (long)Quantum.Physics3D.JointType3D.HingeJoint, Hide = true)]
     [UnityEngine.TooltipAttribute("The maximum torque produced by the hinge motor in order to achieve the target motor speed.\nLeave this checkbox unchecked and the motor toque should not be limited.")]
     public Photon.Deterministic.NullableFP MaxMotorTorque;
 
@@ -7486,6 +7737,8 @@ namespace Quantum.Prototypes.Unity {
       result.ConnectedAnchor = this.ConnectedAnchor;
       result.Anchor = this.Anchor;
       result.Axis = this.Axis;
+      result.SwingAxis = this.SwingAxis;
+      result.TwistAxis = this.TwistAxis;
       result.Frequency = this.Frequency;
       result.DampingRatio = this.DampingRatio;
       result.AutoConfigureDistance = this.AutoConfigureDistance;
@@ -7495,6 +7748,14 @@ namespace Quantum.Prototypes.Unity {
       result.UseAngleLimits = this.UseAngleLimits;
       result.LowerAngle = this.LowerAngle;
       result.UpperAngle = this.UpperAngle;
+      // result.UseSwingAngleLimits = this.UseSwingAngleLimits;
+      // result.SwingLowerAngle = this.SwingLowerAngle;
+      // result.SwingUpperAngle = this.SwingUpperAngle;
+      result.Swing1AngleLimits = this.Swing1AngleLimits;
+      result.Swing2AngleLimits = this.Swing2AngleLimits;
+      result.UseTwistAngleLimits = this.UseTwistAngleLimits;
+      result.TwistLowerAngle = this.TwistLowerAngle;
+      result.TwistUpperAngle = this.TwistUpperAngle;
       result.UseMotor = this.UseMotor;
       result.MotorSpeed = this.MotorSpeed;
       result.MaxMotorTorque = this.MaxMotorTorque;
@@ -7702,7 +7963,7 @@ namespace Quantum {
 
 #region QuantumAssetSourceAssetBundle.cs
 
-#if !QUANTUM_DISABLE_ASSET_BUNDLE_ASSET_SOURCE
+#if QUANTUM_ENABLE_ASSET_BUNDLE_ASSET_SOURCE && !QUANTUM_DISABLE_ASSET_BUNDLE_ASSET_SOURCE
 namespace Quantum {
   using System;
   using System.IO;
@@ -8575,7 +8836,6 @@ namespace Quantum {
 }
 
 #endregion
-
 
 
 #endregion
@@ -9639,7 +9899,7 @@ namespace Quantum {
     /// <summary>
     /// Returns the frame number the instant replay started from.
     /// </summary>
-    public int StartFrame { get; }
+    public int StartFrame { get; private set; }
     /// <summary>
     /// Returns current frame number of the replay.
     /// </summary>
@@ -9647,7 +9907,7 @@ namespace Quantum {
     /// <summary>
     /// Returns the last frame number of the replay which is usually the end frame of the original game when the instant replay was started.
     /// </summary>
-    public int EndFrame { get; }
+    public int EndFrame { get; private set; }
     /// <summary>
     /// Returns true if the instant replay can seek to a desired frame.
     /// </summary>
@@ -9659,7 +9919,11 @@ namespace Quantum {
     /// <summary>
     /// Returns the live Quantum Game.
     /// </summary>
-    public QuantumGame LiveGame { get; }
+    public QuantumGame LiveGame { get; private set; }
+    /// <summary>
+    /// Returns the replay Quantum runner.
+    /// </summary>
+    public QuantumRunner ReplayRunner => _replayRunner;
     /// <summary>
     /// Returns the replay Quantum Game or null.
     /// </summary>
@@ -9670,10 +9934,22 @@ namespace Quantum {
     public float NormalizedTime {
       get {
         var currentFrame = _replayRunner.Game.Frames.Verified.Number;
-        float result = (currentFrame - StartFrame) / (float)(EndFrame - StartFrame);
-        Debug.Assert(result >= 0.0f);
+        var frameCount = EndFrame - StartFrame;
+        if (frameCount <= 0) {
+          return 1.0f;
+        }
+
+        float result = (currentFrame - StartFrame) / (float)frameCount;
+        Debug.Assert(result >= 0.0f, result.ToString());
         return Mathf.Clamp01(result);
       }
+    }
+
+    /// <summary>
+    /// Default constructor.
+    /// </summary>
+    public QuantumInstantReplay() {
+      // Can be removed when obsolete contructor is removed.
     }
 
     /// <summary>
@@ -9685,7 +9961,21 @@ namespace Quantum {
     /// <param name="loop">Automatically loop the instant replay and never stop.</param>
     /// <exception cref="ArgumentNullException">Is raised when the live game is null.</exception>
     /// <exception cref="ArgumentException">Is raised when no valid snapshot was found to start the replay from.</exception>
+    [Obsolete("Use the Run() method instead.")]
     public QuantumInstantReplay(QuantumGame liveGame, float length, QuantumInstantReplaySeekMode seekMode = QuantumInstantReplaySeekMode.Disabled, bool loop = false) {
+      Run(liveGame, length, seekMode, loop);
+    }
+
+    /// <summary>
+    /// Start an instant replay.
+    /// </summary>
+    /// <param name="liveGame">The original game.</param>
+    /// <param name="length">The time in seconds to rewind the original game and start the instant replay from.</param>
+    /// <param name="seekMode">An optional seek mode to seek and rewind the running instant replay.</param>
+    /// <param name="loop">Automatically loop the instant replay and never stop.</param>
+    /// <exception cref="ArgumentNullException">Is raised when the live game is null.</exception>
+    /// <exception cref="ArgumentException">Is raised when no valid snapshot was found to start the replay from.</exception>
+    public void Run(QuantumGame liveGame, float length, QuantumInstantReplaySeekMode seekMode = QuantumInstantReplaySeekMode.Disabled, bool loop = false) {
       if (liveGame == null) {
         throw new ArgumentNullException(nameof(liveGame));
       }
@@ -9716,8 +10006,12 @@ namespace Quantum {
           // Read from the recorded frame until we find the desired start frame.
           StreamReplayInputProvider.ForwardToFrame(liveGame.RecordInputStream, snapshot.Number);
 
-          // Copy part into the memory stream
-          _inputStream = new MemoryStream((int)(recordSteamPosition));
+          if (_inputStream == null) {
+            _inputStream = new MemoryStream((int)(recordSteamPosition));
+          } else {
+            // reuse the buffer across consecutive replays
+            _inputStream.SetLength(0);
+          }
           liveGame.RecordInputStream.CopyTo(_inputStream);
 
           // Reset the recorded steam position
@@ -9752,21 +10046,32 @@ namespace Quantum {
 
       _loop = loop;
 
-      // Create all required start parameters and serialize the snapshot as start data.
-      var arguments = new SessionRunner.Arguments();
-      arguments.InitForInstantReplay(liveGame, snapshot, replayInputProvider);
-      arguments.HeapExtraCount = snapshotsForRewind?.Count ?? 0;
+      if (_replayRunner == null) {
+        // Create all required start parameters and serialize the snapshot as start data.
+        var arguments = new SessionRunner.Arguments();
+        arguments.InitForInstantReplay(liveGame, snapshot, replayInputProvider);
+        arguments.HeapExtraCount = snapshotsForRewind?.Count ?? 0;
 
-      _replayRunner = (QuantumRunner)SessionRunner.Start(arguments);
-      _replayRunner.IsSessionUpdateDisabled = true;
+        _replayRunner = (QuantumRunner)SessionRunner.Start(arguments);
+        _replayRunner.IsSessionUpdateDisabled = true;
 
-      // Run a couple of frames until fully initialized (replayRunner.Session.FrameVerified is set and session state isRunning).
-      for (int i = 0; i < InitialFramesToSimulation; i++) {
-        _replayRunner.Session.Update(1.0f / deterministicConfig.UpdateFPS);
+        // Run a couple of frames until fully initialized (replayRunner.Session.FrameVerified is set and session state isRunning).
+        for (int i = 0; i < InitialFramesToSimulation; i++) {
+          _replayRunner.Session.Update(1.0f / deterministicConfig.UpdateFPS);
+        }
+      } else {
+        var streamReplayInputProvider = replayInputProvider as IDeterministicStreamReplayInputProvider;
+        if (streamReplayInputProvider != null) {
+          _replayRunner.Session.StreamReplayProvider = streamReplayInputProvider;
+        }
+        _replayRunner.Game.Frames.Verified.Heap.Tracker?.Reset();
+        _replayRunner.Session.ResetReplay(snapshot);
+        QuantumRunnerRegistry.Global.AddRunner(_replayRunner);
       }
 
       // clone the original snapshots
-      Debug.Assert(_rewindSnapshots == null);
+      _rewindSnapshots?.Clear();
+      _rewindSnapshots = null;
       if (snapshotsForRewind != null) {
         _rewindSnapshots = new DeterministicFrameRingBuffer(snapshotsForRewind.Count);
         foreach (var frame in snapshotsForRewind) {
@@ -9785,8 +10090,9 @@ namespace Quantum {
     public void Dispose() {
       _rewindSnapshots?.Clear();
       _rewindSnapshots = null;
-      if (_replayRunner) _replayRunner?.Shutdown();
+      var runner = _replayRunner;
       _replayRunner = null;
+      runner?.Shutdown();
     }
 
     /// <summary>
@@ -20108,7 +20414,7 @@ namespace Quantum {
       Manual
     }
 
-    public static void BakeMapData(QuantumMapData data, Boolean inEditor, Boolean bakeColliders = true, Boolean bakePrototypes = true, QuantumMapDataBakeFlags bakeFlags = QuantumMapDataBakeFlags.None, BuildTrigger buildTrigger = BuildTrigger.Manual) {
+    public static void BakeMapData(QuantumMapData data, Boolean inEditor, Boolean bakeColliders = true, Boolean bakePrototypes = true, Boolean bakeTerrains = true, QuantumMapDataBakeFlags bakeFlags = QuantumMapDataBakeFlags.None, BuildTrigger buildTrigger = BuildTrigger.Manual) {
       using var _ = TraceScope("BakeMapData");
       
       using (TraceScope("LoadLookupTables")) {
@@ -20158,6 +20464,12 @@ namespace Quantum {
         InvokeCallbacks(callbacks => callbacks.OnBeforeBake(data));
       }
 
+      if (bakeTerrains) {
+        using (TraceScope("BakeTerrains")) {
+          BakeTerrains(data, inEditor);
+        }
+      }
+
       if (bakeColliders) {
         using (TraceScope("BakeColliders")) {
           BakeColliders(data, inEditor);
@@ -20180,15 +20492,7 @@ namespace Quantum {
       if (inEditor) {
 #if UNITY_EDITOR
         var asset = data.GetAsset(true);
-        
-        var dirPath   = Path.GetDirectoryName(AssetDatabase.GetAssetPath(asset));
-        var assetPath = Path.Combine(dirPath, asset.name + "_mesh.asset");
-
-        var binaryDataAsset = AssetDatabase.LoadAssetAtPath<Quantum.BinaryData>(assetPath);
-        if (binaryDataAsset == null) {
-          binaryDataAsset = ScriptableObject.CreateInstance<Quantum.BinaryData>();
-          AssetDatabase.CreateAsset(binaryDataAsset, assetPath);
-        }
+        var binaryDataAsset = GetOrCreateDependentAsset<BinaryData>(asset, "mesh");
 
         // Serialize to binary some of the data (max 20 megabytes for now)
         var bytestream = new ByteStream(new Byte[asset.GetStaticColliderTrianglesSerializedSize(isWriting: true)]);
@@ -20217,19 +20521,12 @@ namespace Quantum {
 
       if (inEditor) {
 #if UNITY_EDITOR
-        var        dirPath    = Path.GetDirectoryName(AssetDatabase.GetAssetPath(asset));
         ByteStream bytestream = null;
         foreach (var navmesh in navmeshes) {
 
           // create and write navmesh (binary) _data asset
           {
-            var navmeshBinaryFilename = Path.Combine(dirPath, $"{asset.name}_{navmesh.Name}_data.asset");
-            var binaryDataAsset = AssetDatabase.LoadAssetAtPath<Quantum.BinaryData>(navmeshBinaryFilename);
-            if (binaryDataAsset == null) {
-              binaryDataAsset = ScriptableObject.CreateInstance<Quantum.BinaryData>();
-              AssetDatabase.CreateAsset(binaryDataAsset, navmeshBinaryFilename);
-            }
-
+            var binaryDataAsset = GetOrCreateDependentAsset<Quantum.BinaryData>(asset, $"{navmesh.Name}_data");
             // Serialize to binary some of the data (max 60 megabytes for now)
             if (bytestream == null) {
               bytestream = new ByteStream(new Byte[NavMeshSerializationBufferSize]);
@@ -20247,20 +20544,13 @@ namespace Quantum {
 
           // create and write navmesh Quantum asset
           {
-            var navmeshAssetPath = Path.Combine(dirPath, $"{asset.name}_{navmesh.Name}.asset");
-            var navMeshAsset = AssetDatabase.LoadAssetAtPath<Quantum.NavMesh>(navmeshAssetPath);
-            if (navMeshAsset == null) {
-              navMeshAsset = ScriptableObject.CreateInstance<Quantum.NavMesh>();
-              AssetDatabase.CreateAsset(navMeshAsset, navmeshAssetPath);
-            }
-            else {
-              QuantumUnityDB.DisposeGlobalAsset(navMeshAsset.Guid, immediate: true);
-              navmesh.Guid = navMeshAsset.Guid;
-              navmesh.Path = QuantumUnityDB.CreateAssetPathFromUnityPath(navmeshAssetPath);
-            }
+            var navMeshAsset = GetOrCreateDependentAsset<Quantum.NavMesh>(asset, navmesh.Name);
+            QuantumUnityDB.DisposeGlobalAsset(navMeshAsset.Guid, true);
 
             // Preprocessing CopySerialized
             navmesh.name = navMeshAsset.name;
+            navmesh.Guid = navMeshAsset.Guid;
+            navmesh.Path = QuantumUnityDB.CreateAssetPathFromUnityPath(AssetDatabase.GetAssetPath(navMeshAsset));
 
             EditorUtility.CopySerialized(navmesh, navMeshAsset);
             EditorUtility.SetDirty(navMeshAsset);
@@ -20289,7 +20579,7 @@ namespace Quantum {
 
     static StaticColliderData GetStaticData(GameObject gameObject, QuantumStaticColliderSettings settings, int colliderId) {
       return new StaticColliderData {
-        Asset         = settings.Asset,
+        Asset         = settings.UserAsset,
         Name          = gameObject.name,
         Tag           = gameObject.tag,
         Layer         = gameObject.layer,
@@ -20299,13 +20589,29 @@ namespace Quantum {
       };
     }
 
+    public static void BakeTerrains(QuantumMapData data, Boolean inEditor) {
+      var scene = data.gameObject.scene;
+
+#if QUANTUM_ENABLE_PHYSICS3D && !QUANTUM_DISABLE_PHYSICS3D
+      var terrainColliders = FindLocalObjects<QuantumStaticTerrainCollider3D>(scene);
+      foreach (var terrainCollider in terrainColliders) {
+        terrainCollider.Bake();
+      }
+
+      InvokeCallbacks(callbacks => callbacks.OnBakeTerrains(data, terrainColliders));
+#endif
+    }
+
     public static void BakeColliders(QuantumMapData data, Boolean inEditor) {
       var scene = data.gameObject.scene;
       Assert.Check(scene.IsValid(), "Scene is invalid");
 
       // clear existing colliders
-      data.StaticCollider2DReferences = new List<QuantumStaticCollider2DSource>();
-      data.StaticCollider3DReferences = new List<QuantumStaticCollider3DSource>();
+      var colliders2DSources = data.StaticCollider2DReferences;
+      colliders2DSources.Clear();
+      
+      var colliders3DSources = data.StaticCollider3DReferences;
+      colliders3DSources.Clear();
 
       var asset = data.GetAsset(inEditor);
       
@@ -20329,9 +20635,6 @@ namespace Quantum {
       asset.CollidersManagedTriangles = new SortedDictionary<int, MeshTriangleVerticesCcw>();
       asset.StaticColliders3D = Array.Empty<MapStaticCollider3D>();
 
-      // initialize collider references, add default null on offset 0
-      data.StaticCollider3DReferences = new List<QuantumStaticCollider3DSource>();
-
 #if QUANTUM_ENABLE_PHYSICS3D && !QUANTUM_DISABLE_PHYSICS3D
       var colliders3D = FindLocalObjects<QuantumStaticCollider3DSource>(scene);
       InvokeCallbacks(callbacks => callbacks.OnCollectColliders3D(data, colliders3D));
@@ -20341,7 +20644,7 @@ namespace Quantum {
 #endif
 
       // this has to hold
-      Assert.Check(context3D.StaticColliderCount == data.StaticCollider3DReferences.Count);
+      Assert.Check(context3D.StaticColliderCount == colliders3DSources.Count);
 
       // assign collider 3d array
       asset.StaticColliders3D = context3D.Colliders.ToArray();
@@ -20352,6 +20655,17 @@ namespace Quantum {
       
       BakeMeshes(data, inEditor);
 
+#if QUANTUM_ENABLE_CLEAN_SCENE_BAKE
+#if UNITY_EDITOR
+      if (inEditor && AssetDatabase.IsNativeAsset(asset)) {
+        var metadata = GetOrCreateMetadata(asset);
+        metadata.StaticColliders2DIds = FoldSceneObjectIds(colliders2DSources);
+        metadata.StaticColliders3DIds = FoldSceneObjectIds(colliders3DSources);
+        EditorUtility.SetDirty(metadata);
+      }
+#endif
+#endif
+
       if (inEditor) {
         QuantumEditorLog.LogImport($"Baked {asset.StaticColliders2D.Length} 2D static colliders");
         QuantumEditorLog.LogImport($"Baked {asset.StaticColliders3D.Length} 3D static primitive colliders");
@@ -20361,11 +20675,11 @@ namespace Quantum {
 #if QUANTUM_ENABLE_PHYSICS2D && !QUANTUM_DISABLE_PHYSICS2D
       void GetCollidersAndUpdateReferences2D(QuantumStaticCollider2DSource c) {
         var count = context2D.StaticColliderCount;
-        Assert.Check(count == data.StaticCollider2DReferences.Count);
+        Assert.Check(count == colliders2DSources.Count);
         c.GetColliders(context2D);
         Assert.Check(context2D.StaticColliderCount >= count);
         for (int i = count; i < context2D.StaticColliderCount; ++i) {
-          data.StaticCollider2DReferences.Add(c);
+          colliders2DSources.Add(c);
         }
       }
 #endif
@@ -20373,11 +20687,11 @@ namespace Quantum {
 #if QUANTUM_ENABLE_PHYSICS3D && !QUANTUM_DISABLE_PHYSICS3D
       void GetCollidersAndUpdateReferences3D(QuantumStaticCollider3DSource c) {
         var count = context3D.StaticColliderCount;
-        Assert.Check(count == data.StaticCollider3DReferences.Count);
+        Assert.Check(count == colliders3DSources.Count);
         c.GetColliders(context3D);
         Assert.Check(context3D.StaticColliderCount >= count);
         for (int i = count; i < context3D.StaticColliderCount; ++i) {
-          data.StaticCollider3DReferences.Add(c);
+          colliders3DSources.Add(c);
         }
       }
 #endif
@@ -20386,8 +20700,6 @@ namespace Quantum {
     public static void BakePrototypes(QuantumMapData data, bool inEditor) {
       var scene = data.gameObject.scene;
       Assert.Check(scene.IsValid(), "Scene is invalid");
-
-      data.MapEntityReferences.Clear();
       
       var prototypes = FindLocalObjects<QuantumEntityPrototypeSource>(scene).ToArray();
       SortBySiblingIndex(prototypes);
@@ -20401,27 +20713,85 @@ namespace Quantum {
       // this is needed to clear up managed references
       using var so = new SerializedObject(asset);
       so.Update();
+      
+      var globalIds = new GlobalObjectId[prototypes.Length];
+      GlobalObjectId.GetGlobalObjectIdsSlow(prototypes, globalIds);
 #endif
 
-      using var bakeContext = new QuantumEntityPrototypeBakeContext(new QuantumEntityPrototypeConverter(data, prototypes));
+      data.MapEntityReferences.Clear();
+      using var bakeContext = new QuantumEntityPrototypeBakeContext(new QuantumEntityPrototypeConverter(data, prototypes), (type, name) => GetOrCreateDependentAsset(asset, name, type).Guid);
       for (int i = 0; i < prototypes.Length; ++i) {
         var prototype = prototypes[i];
         prototype.GetPrototypes(bakeContext);
-        data.MapEntityReferences.Add(prototype.GetComponent<QuantumEntityView>());
         mapEntities[i] = bakeContext.Flush();
-        
+        var view = prototype.GetComponent<QuantumEntityView>();
+        data.MapEntityReferences.Add(view);
 #if UNITY_EDITOR
-        UpdateManagedReferenceIds(asset, prototype, mapEntities[i].Components);
+        UpdateManagedReferenceIds(asset, globalIds[i], mapEntities[i].Components);
+#if QUANTUM_ENABLE_CLEAN_SCENE_BAKE
+        if (!view) {
+          globalIds[i] = default;
+        }
+#endif
 #endif
       }
       
 #if UNITY_EDITOR
+#if QUANTUM_ENABLE_CLEAN_SCENE_BAKE
+      if (inEditor && AssetDatabase.IsNativeAsset(asset)) {
+        var metadata = GetOrCreateMetadata(asset);
+        metadata.EntityPrototypesIds = FoldSceneObjectIds(globalIds);
+        EditorUtility.SetDirty(metadata);
+      }
+#endif
       so.Update();
       so.ApplyModifiedProperties();
 #endif
     }
+
+#if UNITY_EDITOR
+    internal static QuantumMapBakeMetadata GetOrCreateMetadata(Map asset) {
+      var metadata = QuantumMapBakeMetadata.TryGet(asset);
+      if (!metadata) {
+        metadata = ScriptableObject.CreateInstance<QuantumMapBakeMetadata>();
+        metadata.name = $"{asset.name}_metadata";
+        AssetDatabase.AddObjectToAsset(metadata, asset);
+      }
+
+      metadata.hideFlags = HideFlags.HideInHierarchy | HideFlags.DontSaveInBuild;
+      return metadata;
+    }
+
+    // prefab instances bake to sourceFileID ^ prefabInstanceFileID when a scene is processed;
+    // keep in sync with AssetDatabaseUtils.FoldSceneObjectId, see its docs for the full rule
+    static ulong FoldSceneObjectId(GlobalObjectId id) {
+      if (id.identifierType != 2) {
+        return 0;
+      }
+      return (id.targetObjectId ^ id.targetPrefabId) & 0x7FFFFFFFFFFFFFFF;
+    }
+
+    static ulong[] FoldSceneObjectIds(GlobalObjectId[] ids) {
+      var result = new ulong[ids.Length];
+      for (int i = 0; i < ids.Length; ++i) {
+        result[i] = FoldSceneObjectId(ids[i]);
+      }
+      return result;
+    }
     
-    private static readonly Lazy<Type[]> CallbackTypes = new Lazy<Type[]>(() => {
+    static ulong[] FoldSceneObjectIds<T>(T[] objects) where T : UnityEngine.Object {
+      var globalIds = new GlobalObjectId[objects.Length];
+      // ReSharper disable once CoVariantArrayConversion
+      GlobalObjectId.GetGlobalObjectIdsSlow(objects, globalIds);
+      return FoldSceneObjectIds(globalIds);
+    }
+
+    static ulong[] FoldSceneObjectIds<T>(IReadOnlyList<T> objects) where T : UnityEngine.Object {
+      return FoldSceneObjectIds(objects.ToArray());
+    }
+#endif
+
+    static readonly Lazy<Type[]> CallbackTypes = new Lazy<Type[]>(() => {
       List<Type> callbackTypes = new List<Type>();
 
       if (Application.isEditor) {
@@ -20442,11 +20812,22 @@ namespace Quantum {
         }
 #endif
       } else {
-        var markedAssemblies = AppDomain.CurrentDomain.GetAssemblies()
-          .Where(x => x.GetCustomAttribute<QuantumMapBakeAssemblyAttribute>()?.Ignore == false);
+        foreach (var asm in QuantumPlatform.GetLoadedAssemblies()) {
+          if (!asm.IsDefined(typeof(QuantumMapBakeAssemblyAttribute))) {
+            continue;
+          }
 
-        foreach (var asm in markedAssemblies) {
-          foreach (var t in asm.GetLoadableTypes()) {
+          Type[] types;
+          try {
+            types = asm.GetTypes();
+          } catch (ReflectionTypeLoadException ex) {
+            types = ex.Types;
+          }
+          
+          foreach (var t in types) {
+            if (t == null) {
+              continue;
+            }
             if (!t.IsSubclassOf(typeof(MapDataBakerCallback))) {
               continue;
             }
@@ -20473,7 +20854,7 @@ namespace Quantum {
         try {
           action((MapDataBakerCallback)Activator.CreateInstance(t));
         } catch (Exception ex) {
-          Quantum.Log.Exception(ex);
+          Quantum.Log.Exception($"Error when invoking callbacks on {t.FullName}", ex);
         }
       }
     }
@@ -20487,43 +20868,43 @@ namespace Quantum {
       var scene = data.gameObject.scene;
       Assert.Check(scene.IsValid(), "Scene is invalid");
 
-      var allBakeData = new List<NavMeshBakeData>();
-      var sources = new List<QuantumMapNavMeshUnity>();
+      using var context = new QuantumNavMeshBakeContext((assetType, assetName) => GetOrCreateDependentAsset(asset, assetName, assetType), importUnityNavmesh);
       
+      CollectNavMeshBakeData(data, context);
 
-      // Collect unity navmeshes
-#if QUANTUM_ENABLE_AI_NAVIGATION && !QUANTUM_DISABLE_AI_NAVIGATION
-      if (importUnityNavmesh) {
-        var unityNavmeshes = data.GetComponentsInChildren<QuantumMapNavMeshUnity>().ToList();
-
-        // sorting is important to always generate the same order of regions name list
-        unityNavmeshes.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
-
-        foreach (var source in unityNavmeshes) {
-          try {
-            if (!source.isActiveAndEnabled) {
-              continue;
-            }
-            
-            var bakeData = source.CreateBakeData();
-            if (bakeData == null) {
-              Log.Error($"Could not import navmesh '{source.name}'");
-              continue;
-            }
-
-            allBakeData.Add(bakeData);
-            sources.Add(source);
-            
-          } catch (Exception exn) {
-            Log.Exception(exn);
-          }
-        }
-      }
-#endif
+      var allBakeData = context.BakeData.ToList();
 
       InvokeCallbacks(callbacks => callbacks.OnCollectNavMeshBakeData(data, allBakeData));
 
       return BakeCollectedNavMeshes(data, asset, allBakeData);
+    }
+
+    public static void CollectNavMeshBakeData(QuantumMapData data, QuantumNavMeshBakeContext context) {
+      
+      var sources = FindLocalObjects<IQuantumNavMeshSource>(data.gameObject.scene);
+
+      // sorting is important to always generate the same order of regions name list
+      sources.Sort((a, b) => string.Compare(((Component)a).name, ((Component)b).name, StringComparison.Ordinal));
+
+      foreach (var source in sources) {
+        if (source is Behaviour behaviour && !behaviour.isActiveAndEnabled) {
+          continue;
+        }
+
+        var count = context.BakeData.Count;
+        Assert.Check(count == context.Sources.Count);
+
+        try {
+          source.GetNavMeshes(context);
+        } catch (Exception exn) {
+          Quantum.Log.Exception($"Error when getting nav meshes from {source}", exn);
+        }
+
+        Assert.Check(context.BakeData.Count >= count);
+        for (int i = count; i < context.BakeData.Count; ++i) {
+          context.Sources.Add(source);
+        }
+      }
     }
 
     static List<Quantum.NavMesh> BakeCollectedNavMeshes(QuantumMapData data, Map asset, List<NavMeshBakeData> allBakeData) {
@@ -20551,7 +20932,7 @@ namespace Quantum {
           Log.Debug($"Baking Quantum NavMesh '{bakeData.Name}' complete ({i + 1}/{allBakeData.Count})");
 #endif
         } catch (Exception exn) {
-          Log.Exception(exn);
+          Log.Exception($"Error when baking nav mesh {bakeData.Name}", exn);
         }
 
         if (navmesh != null) {
@@ -20663,10 +21044,7 @@ namespace Quantum {
     }
     
 #if UNITY_EDITOR
-    public static void UpdateManagedReferenceIds(Quantum.Map context, UnityEngine.Object prototype, ComponentPrototype[] componentPrototypes) {
-      
-      var  id = GlobalObjectId.GetGlobalObjectIdSlow(prototype);
-
+    public static void UpdateManagedReferenceIds(Quantum.Map context, GlobalObjectId id, ComponentPrototype[] componentPrototypes) {
       uint hash = 0;
       
       hash = GetHashCodeDeterministic(id.identifierType, hash);
@@ -20721,9 +21099,68 @@ namespace Quantum {
 #else
     public static IDisposable TraceScope(string msg) => null;
 #endif
+
+    static T GetOrCreateDependentAsset<T>(Map mapAsset, string name) where T : AssetObject {
+      return (T)GetOrCreateDependentAsset(mapAsset, name, typeof(T));
+    }
+
+    static AssetObject GetOrCreateDependentAsset(Map mapAsset, string name, Type type) {
+#if UNITY_EDITOR
+      var assetPath = GetDependentAssetPath(mapAsset, name);
+
+      var dependentAsset = (AssetObject)AssetDatabase.LoadAssetAtPath(assetPath, type);
+      if (dependentAsset == null) {
+        dependentAsset = (AssetObject)ScriptableObject.CreateInstance(type);
+        AssetDatabase.CreateAsset(dependentAsset, assetPath);
+      }
+
+      return dependentAsset;
+
+      static string GetDependentAssetPath(Map mapAsset, string name) {
+        var mapPath = AssetDatabase.GetAssetPath(mapAsset);
+        var dirPath = Path.GetDirectoryName(mapPath);
+        return Path.Combine(dirPath!, $"{mapAsset.name}_{name}.asset");
+      }
+#else
+      return (AssetObject)ScriptableObject.CreateInstance(type);
+#endif
+    }
   }
 }
 
+
+#endregion
+
+
+#region Assets/Photon/Quantum/Runtime/QuantumMapDataSceneObjectReferences.cs
+
+#if QUANTUM_ENABLE_CLEAN_SCENE_BAKE
+namespace Quantum {
+  using System.Collections.Generic;
+
+  /// <summary>
+  /// Carries the <see cref="QuantumEntityView"/> references for the map entities of a baked map.
+  /// The component is injected next to <see cref="QuantumMapData"/> when a scene is processed for
+  /// a build or play mode and is never stored in editor scenes.
+  /// </summary>
+  class QuantumMapDataSceneObjectReferences : QuantumMonoBehaviour {
+    /// <summary>
+    /// One-to-one mapping of Quantum map entity entries in <see cref="Map.MapEntities"/> to their views.
+    /// </summary>
+    public List<QuantumEntityView> Views = new();
+
+    /// <summary>
+    /// One-to-one mapping of <see cref="Map.StaticColliders2D"/> entries to their source scripts.
+    /// </summary>
+    public List<QuantumStaticCollider2DSource> StaticCollider2DReferences = new();
+
+    /// <summary>
+    /// One-to-one mapping of <see cref="Map.StaticColliders3D"/> entries to their source scripts.
+    /// </summary>
+    public List<QuantumStaticCollider3DSource> StaticCollider3DReferences = new();
+  }
+}
+#endif
 
 #endregion
 
@@ -21233,6 +21670,17 @@ namespace Quantum {
 
           progressBar?.SetInfo("Removing Unused Vertices");
           ImportUtils.RemoveUnusedVertices(ref Vertices, ref Triangles, p => progressBar?.SetProgress(p));
+        }
+
+        // Repair remaining hairline seams by welding open vertices and splitting T-junctions
+        if (settings.RepairSeams) {
+          progressBar?.SetInfo("Repairing Seams");
+          SeamRepair.Repair(ref Vertices, ref Triangles, settings.SeamRepairSettings, out var weldedVertices, out var splitEdges, p => progressBar?.SetProgress(p));
+          if (weldedVertices > 0 || splitEdges > 0) {
+            QuantumEditorLog.LogImport($"Seam repair welded {weldedVertices} vertices and split {splitEdges} open edges");
+            progressBar?.SetInfo("Removing Unused Vertices");
+            ImportUtils.RemoveUnusedVertices(ref Vertices, ref Triangles, p => progressBar?.SetProgress(p));
+          }
         }
 
         if (settings.DelaunayTriangulation) {
@@ -22594,6 +23042,18 @@ namespace Quantum {
       [DrawIf("FixTrianglesOnEdges", true)]
       public float FixTrianglesOnEdgesHeightEpsilon = 0.05f;
       /// <summary>
+      /// Automatically closes hairline seams that cause false borders generated by welding nearly identical open vertices and by splitting open edges at T-junction vertices.
+      /// Uses <see cref="SeamRepair.Settings.SeamDistance"/> as the T-junction search distance/>.
+      /// </summary>
+      [InlineHelp]
+      public bool RepairSeams = true;
+      /// <summary>
+      /// The seam detection settings used by the repair.
+      /// </summary>
+      [InlineHelp]
+      [DrawIf("RepairSeams", true)]
+      public SeamRepair.Settings SeamRepairSettings = new SeamRepair.Settings();
+      /// <summary>
       /// Automatically correct navmesh link position to the closest triangle by searching this distance (default is 0).
       /// </summary>
       [InlineHelp]
@@ -22648,6 +23108,711 @@ namespace Quantum {
       [HideInInspector]
       [DrawIf("ImportRegionMode", (int)NavmeshRegionImportMode.Disabled, compare: CompareOperator.Greater, mode: DrawIfMode.Hide)]
       public List<Int32> RegionAreaIds;
+    }
+  }
+}
+
+#endregion
+
+
+#region Assets/Photon/Quantum/Runtime/QuantumNavMesh.SeamRepair.cs
+
+namespace Quantum {
+  using System;
+  using UnityEngine;
+#if QUANTUM_ENABLE_AI_NAVIGATION && !QUANTUM_DISABLE_AI_NAVIGATION
+  using System.Collections.Generic;
+#endif
+
+  public partial class QuantumNavMesh {
+    /// <summary>
+    /// Repairs hairline seams in the intermediate navmesh data with three escalating passes:
+    /// open (border) vertices that are nearly identical are welded into one, open edges are split at T-junction
+    /// vertices that lie on their interior and remaining seams between two facing open edges are zipped by
+    /// anchoring the ends of the hairline section: endpoint pairs across the gap are welded to their midpoint,
+    /// a corner vertex of one side is inserted into the other side's edge and where the section end has no
+    /// vertex at all (a vertex-free sliver) a new stitch vertex is created in the middle of the gap and inserted
+    /// into both edges.
+    /// The repair never moves geometry by more than the configured seam distance.
+    /// Runs on the intermediate import data because triangle connectivity (portals) is established by shared
+    /// vertex indices during baking, which also makes the repair immune to fixed point quantization.
+    /// </summary>
+    public static class SeamRepair {
+      const int MaxIterations = 16;
+
+      /// <summary>
+      /// The seam repair and validation settings.
+      /// </summary>
+      [Serializable]
+      public class Settings {
+        /// <summary>
+        /// Gaps between two opposing border edges narrower than this distance (in world units) are treated as seams:
+        /// the repair closes them by welding and splitting, the validation reports them. Default is 0.05.
+        /// </summary>
+        [InlineHelp]
+        [Min(float.Epsilon)]
+        public float SeamDistance = 0.05f;
+        /// <summary>
+        /// A gap must stay narrower than <see cref="SeamDistance"/> for at least this length (in world units) to be treated as a seam.
+        /// This filters out genuine sharp corners of the navmesh boundary. Default is 0.25.
+        /// </summary>
+        [InlineHelp]
+        [Min(float.Epsilon)]
+        public float MinSeamLength = 0.25f;
+        /// <summary>
+        /// Geometry that is further apart vertically than this distance (in world units) is treated as different floors and is neither repaired nor reported. Default is 0.05.
+        /// </summary>
+        [InlineHelp]
+        [Min(float.Epsilon)]
+        public float HeightEpsilon = 0.05f;
+        /// <summary>
+        /// Two distinct border vertices closer to each other than this distance (in world units) are welded by the repair and reported as unwelded duplicates. Default is 0.01.
+        /// </summary>
+        [InlineHelp]
+        [Min(float.Epsilon)]
+        public float UnweldedVertexDistance = 0.01f;
+      }
+
+#if QUANTUM_ENABLE_AI_NAVIGATION && !QUANTUM_DISABLE_AI_NAVIGATION
+
+      struct OpenEdge {
+        public int Triangle;
+        public int EdgeIndex;
+        public int V0;
+        public int V1;
+      }
+
+      /// <summary>
+      /// Repairs seams by alternating weld and split passes until the mesh is stable.
+      /// Uses <see cref="Settings.UnweldedVertexDistance"/> as the weld distance,
+      /// <see cref="Settings.SeamDistance"/> as the T-junction search distance and
+      /// <see cref="Settings.HeightEpsilon"/> to separate different floors.
+      /// Run <see cref="ImportUtils.RemoveUnusedVertices"/> afterwards when vertices were welded.
+      /// </summary>
+      /// <param name="vertices">Mesh vertices collection.</param>
+      /// <param name="triangles">Mesh triangles collection, triangles are added when edges are split.</param>
+      /// <param name="settings">The seam thresholds, uses defaults when <see langword="null"/>.</param>
+      /// <param name="weldedVertices">The number of vertices that were welded onto another vertex.</param>
+      /// <param name="splitEdges">The number of open edges that were split at a T-junction vertex.</param>
+      /// <param name="reporter">Optional progress callback reporting values between 0 and 1.</param>
+      public static void Repair(ref Vertex[] vertices, ref NavMeshBakeDataTriangle[] triangles, Settings settings, out int weldedVertices, out int splitEdges, Action<float> reporter = null) {
+        settings = settings ?? new Settings();
+        weldedVertices = 0;
+        splitEdges = 0;
+
+        for (int iteration = 0; iteration < MaxIterations; ++iteration) {
+          reporter?.Invoke(iteration / (float)MaxIterations);
+
+          var allEdges = new HashSet<long>();
+          var openEdges = FindOpenEdges(triangles, allEdges);
+          if (openEdges.Count == 0) {
+            break;
+          }
+
+          // Welding changes vertex indices which invalidates the open edge list, so each pass
+          // only runs on an iteration where the previous pass found nothing and the loop
+          // rebuilds the list in between.
+          var changes = WeldOpenVertices(vertices, triangles, openEdges, allEdges, settings);
+          weldedVertices += changes;
+
+          if (changes == 0) {
+            changes = SplitTJunctions(vertices, ref triangles, openEdges, settings);
+            splitEdges += changes;
+          }
+
+          if (changes == 0) {
+            changes = ZipSeamPairs(ref vertices, ref triangles, openEdges, allEdges, settings, out var zipWelds, out var zipSplits);
+            weldedVertices += zipWelds;
+            splitEdges += zipSplits;
+          }
+
+          if (changes == 0) {
+            break;
+          }
+        }
+
+        reporter?.Invoke(1.0f);
+      }
+
+      /// <summary>
+      /// Finds all edges that are used by exactly one triangle. Degenerated triangles are ignored,
+      /// they are removed later in the import pipeline.
+      /// </summary>
+      static List<OpenEdge> FindOpenEdges(NavMeshBakeDataTriangle[] triangles, HashSet<long> allEdges) {
+        var usage = new Dictionary<long, int>();
+        for (int t = 0; t < triangles.Length; ++t) {
+          if (IsDegenerate(triangles[t])) {
+            continue;
+          }
+
+          var ids = triangles[t].VertexIds;
+          for (int e = 0; e < 3; ++e) {
+            var key = PairKey(ids[e], ids[(e + 1) % 3]);
+            usage.TryGetValue(key, out var count);
+            usage[key] = count + 1;
+            allEdges.Add(key);
+          }
+        }
+
+        var result = new List<OpenEdge>();
+        for (int t = 0; t < triangles.Length; ++t) {
+          if (IsDegenerate(triangles[t])) {
+            continue;
+          }
+
+          var ids = triangles[t].VertexIds;
+          for (int e = 0; e < 3; ++e) {
+            var v0 = ids[e];
+            var v1 = ids[(e + 1) % 3];
+            if (usage[PairKey(v0, v1)] == 1) {
+              result.Add(new OpenEdge { Triangle = t, EdgeIndex = e, V0 = v0, V1 = v1 });
+            }
+          }
+        }
+
+        return result;
+      }
+
+      static bool IsDegenerate(NavMeshBakeDataTriangle triangle) {
+        var ids = triangle.VertexIds;
+        if (ids == null || ids.Length != 3) {
+          return true;
+        }
+
+        return ids[0] == ids[1] || ids[0] == ids[2] || ids[1] == ids[2];
+      }
+
+      /// <summary>
+      /// Welds open vertices that are nearly identical but not connected by an edge, remapping the higher
+      /// vertex index onto the lower one like <see cref="ImportUtils.WeldIdenticalVertices"/>.
+      /// </summary>
+      static int WeldOpenVertices(Vertex[] vertices, NavMeshBakeDataTriangle[] triangles, List<OpenEdge> openEdges, HashSet<long> allEdges, Settings settings) {
+        var openVertices = CollectOpenVertices(openEdges);
+        var grid = BuildVertexGrid(i => vertices[i].Position, openVertices, out var cellSize);
+
+        var remap = new int[vertices.Length];
+        for (int i = 0; i < remap.Length; ++i) {
+          remap[i] = i;
+        }
+
+        var weldDistanceSqr = (double)settings.UnweldedVertexDistance * settings.UnweldedVertexDistance;
+        var welds = 0;
+
+        for (int i = 0; i < openVertices.Count; ++i) {
+          var v = openVertices[i];
+          if (remap[v] != v) {
+            continue;
+          }
+
+          var p = vertices[v].Position;
+          var x = CellIndex(p.X, cellSize);
+          var z = CellIndex(p.Z, cellSize);
+
+          for (int dx = -1; dx <= 1; ++dx) {
+            for (int dz = -1; dz <= 1; ++dz) {
+              if (grid.TryGetValue(CellKey(x + dx, z + dz), out var cell) == false) {
+                continue;
+              }
+
+              for (int c = 0; c < cell.Count; ++c) {
+                var other = cell[c];
+                if (other <= v || remap[other] != other) {
+                  continue;
+                }
+
+                // Nearby vertices that share an edge are intended boundary detail, not a seam
+                if (allEdges.Contains(PairKey(v, other))) {
+                  continue;
+                }
+
+                if (Vector3Double.SqrMagnitude(vertices[other].Position - p) <= weldDistanceSqr) {
+                  remap[other] = v;
+                  ++welds;
+                }
+              }
+            }
+          }
+        }
+
+        if (welds > 0) {
+          for (int t = 0; t < triangles.Length; ++t) {
+            var ids = triangles[t].VertexIds;
+            if (ids == null) {
+              continue;
+            }
+
+            for (int e = 0; e < ids.Length; ++e) {
+              ids[e] = remap[ids[e]];
+            }
+          }
+        }
+
+        return welds;
+      }
+
+      /// <summary>
+      /// Splits open edges at open vertices that lie on their interior (T-junctions).
+      /// Every triangle is split at most once per pass, remaining junctions are handled by the next iteration.
+      /// </summary>
+      static int SplitTJunctions(Vertex[] vertices, ref NavMeshBakeDataTriangle[] triangles, List<OpenEdge> openEdges, Settings settings) {
+        var openVertices = CollectOpenVertices(openEdges);
+        var grid = BuildVertexGrid(i => vertices[i].Position, openVertices, out var cellSize);
+
+        var splitTriangles = new HashSet<int>();
+        var splits = 0;
+
+        for (int i = 0; i < openEdges.Count; ++i) {
+          var edge = openEdges[i];
+          if (splitTriangles.Contains(edge.Triangle)) {
+            continue;
+          }
+
+          var p0 = vertices[edge.V0].Position;
+          var p1 = vertices[edge.V1].Position;
+          var apex = triangles[edge.Triangle].VertexIds[(edge.EdgeIndex + 2) % 3];
+
+          var x0 = CellIndex(Math.Min(p0.X, p1.X) - settings.SeamDistance, cellSize);
+          var x1 = CellIndex(Math.Max(p0.X, p1.X) + settings.SeamDistance, cellSize);
+          var z0 = CellIndex(Math.Min(p0.Z, p1.Z) - settings.SeamDistance, cellSize);
+          var z1 = CellIndex(Math.Max(p0.Z, p1.Z) + settings.SeamDistance, cellSize);
+
+          var bestVertex = -1;
+          var bestDistance = (double)settings.SeamDistance;
+
+          for (int x = x0; x <= x1; ++x) {
+            for (int z = z0; z <= z1; ++z) {
+              if (grid.TryGetValue(CellKey(x, z), out var cell) == false) {
+                continue;
+              }
+
+              for (int c = 0; c < cell.Count; ++c) {
+                var v = cell[c];
+                // Never split a triangle at one of its own vertices (a needle sliver's apex can lie
+                // on the interior of its own open edge), that only produces degenerate triangles.
+                if (v == edge.V0 || v == edge.V1 || v == apex) {
+                  continue;
+                }
+
+                var d = DistancePointSegmentXZ(vertices[v].Position, p0, p1, out var height);
+                if (d > bestDistance || height > settings.HeightEpsilon) {
+                  continue;
+                }
+
+                // Only split at vertices on the interior of the edge, vertices near the edge
+                // endpoints are regular corners of the boundary.
+                if (DistanceXZ(vertices[v].Position, p0) <= settings.SeamDistance ||
+                    DistanceXZ(vertices[v].Position, p1) <= settings.SeamDistance) {
+                  continue;
+                }
+
+                bestVertex = v;
+                bestDistance = d;
+              }
+            }
+          }
+
+          if (bestVertex >= 0) {
+            ImportUtils.SplitTriangle(ref triangles, edge.Triangle, edge.EdgeIndex, bestVertex);
+            splitTriangles.Add(edge.Triangle);
+            ++splits;
+          }
+        }
+
+        return splits;
+      }
+
+      /// <summary>
+      /// Detects pairs of facing open edges that run nearly coincident and closes the hairline section between them by
+      /// anchoring both of its ends, welding, inserting or creating stitch vertices as needed.
+      /// The middle section then shares both vertex indices on both sides and is no longer an open edge.
+      /// </summary>
+      static int ZipSeamPairs(ref Vertex[] vertices, ref NavMeshBakeDataTriangle[] triangles, List<OpenEdge> openEdges, HashSet<long> allEdges, Settings settings, out int welds, out int splits) {
+        welds = 0;
+        splits = 0;
+
+        // Hash the open edges into a coarse 2D grid so only nearby edges are tested against each other
+        double cellSize = Math.Max(2.0, settings.SeamDistance * 4);
+        var grid = new Dictionary<long, List<int>>();
+        for (int i = 0; i < openEdges.Count; ++i) {
+          RasterizeSegment(grid, vertices[openEdges[i].V0].Position, vertices[openEdges[i].V1].Position, settings.SeamDistance, cellSize, i);
+        }
+
+        var remap = new int[vertices.Length];
+        for (int i = 0; i < remap.Length; ++i) {
+          remap[i] = i;
+        }
+
+        var splitTriangles = new HashSet<int>();
+        var testedPairs = new HashSet<long>();
+
+        foreach (var cell in grid.Values) {
+          for (int i = 0; i < cell.Count; ++i) {
+            for (int j = i + 1; j < cell.Count; ++j) {
+              if (testedPairs.Add(PairKey(cell[i], cell[j])) == false) {
+                continue;
+              }
+
+              var a = openEdges[cell[i]];
+              var b = openEdges[cell[j]];
+              if (splitTriangles.Contains(a.Triangle) || splitTriangles.Contains(b.Triangle)) {
+                continue;
+              }
+
+              if (TryGetSeamSection(vertices, a, b, settings, out var sLo, out var sHi) == false) {
+                continue;
+              }
+
+              StitchSectionEnd(ref vertices, ref triangles, a, b, sLo, allEdges, splitTriangles, remap, settings, ref welds, ref splits);
+              StitchSectionEnd(ref vertices, ref triangles, a, b, sHi, allEdges, splitTriangles, remap, settings, ref welds, ref splits);
+            }
+          }
+        }
+
+        if (welds > 0) {
+          for (int t = 0; t < triangles.Length; ++t) {
+            var ids = triangles[t].VertexIds;
+            if (ids == null) {
+              continue;
+            }
+
+            for (int e = 0; e < ids.Length; ++e) {
+              // Stitch vertices created during this pass are beyond the remap table and never welded
+              if (ids[e] < remap.Length) {
+                ids[e] = remap[ids[e]];
+              }
+            }
+          }
+        }
+
+        return welds + splits;
+      }
+
+      /// <summary>
+      /// Computes the parameter section on edge <paramref name="a"/> along which the gap towards the facing
+      /// edge <paramref name="b"/> stays below the seam distance, using the shared linear gap model.
+      /// </summary>
+      static bool TryGetSeamSection(Vertex[] vertices, OpenEdge a, OpenEdge b, Settings settings, out double sLo, out double sHi) {
+        sLo = 0;
+        sHi = 0;
+
+        var a0 = vertices[a.V0].Position;
+        var a1 = vertices[a.V1].Position;
+        var b0 = vertices[b.V0].Position;
+        var b1 = vertices[b.V1].Position;
+
+        // Open edges follow the triangle winding, a seam requires the two edges to run in
+        // opposite directions (facing each other), like the border normal test of the validator.
+        var facing = (a1.X - a0.X) * (b1.X - b0.X) + (a1.Z - a0.Z) * (b1.Z - b0.Z);
+        if (facing >= 0) {
+          return false;
+        }
+
+        return TryGetSeamSection(a0, a1, b0, b1, settings, out sLo, out sHi);
+      }
+
+      /// <summary>
+      /// Anchors one end of a hairline section so that both sides of the seam share a vertex index there:
+      /// welds two existing endpoints to their midpoint, inserts an existing corner vertex into the opposing
+      /// edge, or creates a new stitch vertex in the middle of the gap and inserts it into both edges.
+      /// </summary>
+      static void StitchSectionEnd(ref Vertex[] vertices, ref NavMeshBakeDataTriangle[] triangles, OpenEdge a, OpenEdge b, double s, HashSet<long> allEdges, HashSet<int> splitTriangles, int[] remap, Settings settings, ref int welds, ref int splits) {
+        var a0 = vertices[a.V0].Position;
+        var a1 = vertices[a.V1].Position;
+        var b0 = vertices[b.V0].Position;
+        var b1 = vertices[b.V1].Position;
+
+        var pointOnA = Lerp(a0, a1, s);
+        var u = ProjectOnSegmentXZ(pointOnA, b0, b1);
+        var pointOnB = Lerp(b0, b1, u);
+
+        var anchorA = ResolveAnchor(pointOnA, a, vertices, settings);
+        var anchorB = ResolveAnchor(pointOnB, b, vertices, settings);
+
+        if (anchorA >= 0 && anchorA == anchorB) {
+          // The section end is already a shared vertex (e.g. the tip of a sliver wedge)
+          return;
+        }
+
+        if (anchorA >= 0 && anchorB >= 0) {
+          // Two existing endpoints face each other across the gap, weld them to their midpoint
+          if (remap[anchorA] != anchorA || remap[anchorB] != anchorB) {
+            return;
+          }
+
+          if (allEdges.Contains(PairKey(anchorA, anchorB))) {
+            return;
+          }
+
+          if (DistanceXZ(vertices[anchorA].Position, vertices[anchorB].Position) > settings.SeamDistance ||
+              Math.Abs(vertices[anchorA].Position.Y - vertices[anchorB].Position.Y) > settings.HeightEpsilon) {
+            return;
+          }
+
+          var target = Math.Min(anchorA, anchorB);
+          var source = Math.Max(anchorA, anchorB);
+          vertices[target].Position = Lerp(vertices[anchorA].Position, vertices[anchorB].Position, 0.5);
+          remap[source] = target;
+          ++welds;
+          return;
+        }
+
+        var apexA = triangles[a.Triangle].VertexIds[(a.EdgeIndex + 2) % 3];
+        var apexB = triangles[b.Triangle].VertexIds[(b.EdgeIndex + 2) % 3];
+
+        if (anchorA >= 0) {
+          // Insert the existing corner vertex of edge A into edge B, unless it is one of the
+          // split triangle's own vertices (splitting at a corner only produces degenerate triangles)
+          if (anchorA == b.V0 || anchorA == b.V1 || anchorA == apexB ||
+              remap[anchorA] != anchorA || splitTriangles.Add(b.Triangle) == false) {
+            return;
+          }
+
+          ImportUtils.SplitTriangle(ref triangles, b.Triangle, b.EdgeIndex, anchorA);
+          AddSplitEdges(allEdges, b.V0, b.V1, apexB, anchorA);
+          ++splits;
+          return;
+        }
+
+        if (anchorB >= 0) {
+          // Insert the existing corner vertex of edge B into edge A, unless it is one of the
+          // split triangle's own vertices (splitting at a corner only produces degenerate triangles)
+          if (anchorB == a.V0 || anchorB == a.V1 || anchorB == apexA ||
+              remap[anchorB] != anchorB || splitTriangles.Add(a.Triangle) == false) {
+            return;
+          }
+
+          ImportUtils.SplitTriangle(ref triangles, a.Triangle, a.EdgeIndex, anchorB);
+          AddSplitEdges(allEdges, a.V0, a.V1, apexA, anchorB);
+          ++splits;
+          return;
+        }
+
+        // Vertex-free section end (sliver wedge), create a new stitch vertex in the middle
+        // of the gap and insert it into both edges. Skip when both edges belong to the same
+        // triangle: the first split rewrites its VertexIds, invalidating b.EdgeIndex for the
+        // second split.
+        if (a.Triangle == b.Triangle || splitTriangles.Contains(a.Triangle) || splitTriangles.Contains(b.Triangle)) {
+          return;
+        }
+
+        var stitchIndex = vertices.Length;
+        ArrayUtils.Add(ref vertices, new Vertex { Position = Lerp(pointOnA, pointOnB, 0.5) });
+        ImportUtils.SplitTriangle(ref triangles, a.Triangle, a.EdgeIndex, stitchIndex);
+        ImportUtils.SplitTriangle(ref triangles, b.Triangle, b.EdgeIndex, stitchIndex);
+        AddSplitEdges(allEdges, a.V0, a.V1, apexA, stitchIndex);
+        AddSplitEdges(allEdges, b.V0, b.V1, apexB, stitchIndex);
+        splitTriangles.Add(a.Triangle);
+        splitTriangles.Add(b.Triangle);
+        ++splits;
+      }
+
+      /// <summary>
+      /// Registers the edges created by inserting vNew into edge (v0, v1) of a triangle with the
+      /// given apex vertex, so the weld guards see topology created earlier in the same pass.
+      /// </summary>
+      static void AddSplitEdges(HashSet<long> allEdges, int v0, int v1, int apex, int vNew) {
+        allEdges.Add(PairKey(v0, vNew));
+        allEdges.Add(PairKey(vNew, v1));
+        allEdges.Add(PairKey(vNew, apex));
+      }
+
+      /// <summary>
+      /// Returns the edge endpoint vertex index when the point is close enough to snap to it, otherwise -1.
+      /// </summary>
+      static int ResolveAnchor(Vector3Double point, OpenEdge edge, Vertex[] vertices, Settings settings) {
+        if (DistanceXZ(point, vertices[edge.V0].Position) <= settings.UnweldedVertexDistance) {
+          return edge.V0;
+        }
+
+        if (DistanceXZ(point, vertices[edge.V1].Position) <= settings.UnweldedVertexDistance) {
+          return edge.V1;
+        }
+
+        return -1;
+      }
+
+      static double ProjectOnSegmentXZ(Vector3Double p, Vector3Double s0, Vector3Double s1) {
+        var dx = s1.X - s0.X;
+        var dz = s1.Z - s0.Z;
+        var lenSqr = dx * dx + dz * dz;
+        var t = lenSqr > 1e-12 ? ((p.X - s0.X) * dx + (p.Z - s0.Z) * dz) / lenSqr : 0;
+        return Math.Max(0, Math.Min(1, t));
+      }
+
+      static List<int> CollectOpenVertices(List<OpenEdge> openEdges) {
+        var seen = new HashSet<int>();
+        var result = new List<int>();
+        for (int i = 0; i < openEdges.Count; ++i) {
+          if (seen.Add(openEdges[i].V0)) {
+            result.Add(openEdges[i].V0);
+          }
+
+          if (seen.Add(openEdges[i].V1)) {
+            result.Add(openEdges[i].V1);
+          }
+        }
+
+        result.Sort();
+        return result;
+      }
+
+      /// <summary>
+      /// Computes the parameter section [sLo, sHi] on segment (a0, a1) along which the gap towards the
+      /// facing segment (b0, b1) stays below the seam distance. The gap width changes linearly along the
+      /// projected overlap of the two segments. Returns false when the segments do not overlap, the
+      /// closest gap lies on a different floor or the section is shorter than the min seam length.
+      /// The facing criterion is tested by the callers (edge winding in the repair, border normals when
+      /// validating a baked navmesh).
+      /// </summary>
+      public static bool TryGetSeamSection(Vector3Double a0, Vector3Double a1, Vector3Double b0, Vector3Double b1, Settings settings, out double sLo, out double sHi) {
+        sLo = 0;
+        sHi = 0;
+
+        var dirX = a1.X - a0.X;
+        var dirZ = a1.Z - a0.Z;
+        var lenSqr = dirX * dirX + dirZ * dirZ;
+        if (lenSqr < 1e-12) {
+          return false;
+        }
+
+        // Overlap of segment B projected onto segment A, in the parameter space of A
+        var t0 = ((b0.X - a0.X) * dirX + (b0.Z - a0.Z) * dirZ) / lenSqr;
+        var t1 = ((b1.X - a0.X) * dirX + (b1.Z - a0.Z) * dirZ) / lenSqr;
+        var tLo = Math.Max(0, Math.Min(t0, t1));
+        var tHi = Math.Min(1, Math.Max(t0, t1));
+        if (tHi <= tLo) {
+          return false;
+        }
+
+        var pLo = Lerp(a0, a1, tLo);
+        var pHi = Lerp(a0, a1, tHi);
+        var dLo = DistancePointSegmentXZ(pLo, b0, b1, out var heightLo);
+        var dHi = DistancePointSegmentXZ(pHi, b0, b1, out var heightHi);
+
+        // Where the gap is closest the two meshes must be at the same height, otherwise these are different floors
+        if ((dLo <= dHi ? heightLo : heightHi) > settings.HeightEpsilon) {
+          return false;
+        }
+
+        var dMin = Math.Min(dLo, dHi);
+        var dMax = Math.Max(dLo, dHi);
+        if (dMin >= settings.SeamDistance) {
+          return false;
+        }
+
+        sLo = tLo;
+        sHi = tHi;
+        if (dMax > settings.SeamDistance) {
+          var fraction = (settings.SeamDistance - dMin) / (dMax - dMin);
+          if (dLo <= dHi) {
+            sHi = tLo + (tHi - tLo) * fraction;
+          } else {
+            sLo = tHi - (tHi - tLo) * fraction;
+          }
+        }
+
+        return (sHi - sLo) * Math.Sqrt(lenSqr) >= settings.MinSeamLength;
+      }
+
+      /// <summary>
+      /// Hashes the given vertex indices into a coarse 2D grid keyed by <see cref="CellKey"/> so only
+      /// nearby vertices are tested against each other.
+      /// </summary>
+      public static Dictionary<long, List<int>> BuildVertexGrid(Func<int, Vector3Double> position, List<int> vertices, out double cellSize) {
+        cellSize = 0.5;
+        var grid = new Dictionary<long, List<int>>();
+        for (int i = 0; i < vertices.Count; ++i) {
+          var v = vertices[i];
+          var p = position(v);
+          var key = CellKey(CellIndex(p.X, cellSize), CellIndex(p.Z, cellSize));
+          if (grid.TryGetValue(key, out var cell) == false) {
+            grid[key] = cell = new List<int>();
+          }
+
+          cell.Add(v);
+        }
+
+        return grid;
+      }
+
+      /// <summary>
+      /// Adds <paramref name="value"/> to every grid cell touched by the bounding box of the segment
+      /// (p0, p1) expanded by <paramref name="expand"/>.
+      /// </summary>
+      public static void RasterizeSegment(Dictionary<long, List<int>> grid, Vector3Double p0, Vector3Double p1, double expand, double cellSize, int value) {
+        var x0 = CellIndex(Math.Min(p0.X, p1.X) - expand, cellSize);
+        var x1 = CellIndex(Math.Max(p0.X, p1.X) + expand, cellSize);
+        var z0 = CellIndex(Math.Min(p0.Z, p1.Z) - expand, cellSize);
+        var z1 = CellIndex(Math.Max(p0.Z, p1.Z) + expand, cellSize);
+        for (int x = x0; x <= x1; ++x) {
+          for (int z = z0; z <= z1; ++z) {
+            var key = CellKey(x, z);
+            if (grid.TryGetValue(key, out var cell) == false) {
+              grid[key] = cell = new List<int>();
+            }
+
+            cell.Add(value);
+          }
+        }
+      }
+
+      /// <summary>
+      /// Returns the XZ plane distance between point <paramref name="p"/> and the closest point on the
+      /// segment (s0, s1), with the vertical distance at that point in <paramref name="heightDistance"/>.
+      /// </summary>
+      public static double DistancePointSegmentXZ(Vector3Double p, Vector3Double s0, Vector3Double s1, out double heightDistance) {
+        var dx = s1.X - s0.X;
+        var dz = s1.Z - s0.Z;
+        var lenSqr = dx * dx + dz * dz;
+        var t = lenSqr > 1e-12 ? ((p.X - s0.X) * dx + (p.Z - s0.Z) * dz) / lenSqr : 0;
+        t = Math.Max(0, Math.Min(1, t));
+
+        var cx = s0.X + t * dx;
+        var cy = s0.Y + t * (s1.Y - s0.Y);
+        var cz = s0.Z + t * dz;
+
+        heightDistance = Math.Abs(p.Y - cy);
+        return Math.Sqrt((p.X - cx) * (p.X - cx) + (p.Z - cz) * (p.Z - cz));
+      }
+
+      /// <summary>
+      /// Returns the distance between the two points in the XZ plane.
+      /// </summary>
+      public static double DistanceXZ(Vector3Double a, Vector3Double b) {
+        var dx = b.X - a.X;
+        var dz = b.Z - a.Z;
+        return Math.Sqrt(dx * dx + dz * dz);
+      }
+
+      /// <summary>
+      /// Linearly interpolates between the two points.
+      /// </summary>
+      public static Vector3Double Lerp(Vector3Double a, Vector3Double b, double t) {
+        return a + (b - a) * t;
+      }
+
+      /// <summary>
+      /// Returns an order-independent key for the index pair.
+      /// </summary>
+      public static long PairKey(int a, int b) {
+        return a < b ? ((long)a << 32) | (uint)b : ((long)b << 32) | (uint)a;
+      }
+
+      /// <summary>
+      /// Returns the grid key for the cell coordinates.
+      /// </summary>
+      public static long CellKey(int x, int z) {
+        return ((long)x << 32) | (uint)z;
+      }
+
+      /// <summary>
+      /// Returns the grid cell coordinate of the world coordinate.
+      /// </summary>
+      public static int CellIndex(double v, double cellSize) {
+        return (int)Math.Floor(v / cellSize);
+      }
+
+#endif // QUANTUM_ENABLE_AI_NAVIGATION && !QUANTUM_DISABLE_AI_NAVIGATION
     }
   }
 }
@@ -23504,7 +24669,7 @@ namespace Quantum {
     }
 
     /// <summary>
-    /// Calls <see cref="SessionRunner.Shutdown(ShutdownCause)"/> on all runners.
+    /// Calls <see cref="SessionRunner.Shutdown"/> on all runners.
     /// </summary>
     public void ShutdownAll() {
       for (int i = _activeRunners.Count - 1; i >= 0; i--) {
@@ -23528,7 +24693,9 @@ namespace Quantum {
     /// Add a runner.
     /// </summary>
     public void AddRunner(SessionRunner runner) {
-      _activeRunners.Add(runner);
+      if (_activeRunners.Contains(runner) == false) {
+        _activeRunners.Add(runner);
+      }
     }
 
     /// <summary>
@@ -23984,6 +25151,12 @@ namespace Quantum {
 
   /// <summary/>
   public abstract class QuantumStaticCollider2DSource : QuantumMonoBehaviour {
+    /// <summary>
+    /// Additional static collider settings.
+    /// </summary>
+    [InlineHelp, DrawInline, Space]
+    public QuantumStaticColliderSettings Settings = new QuantumStaticColliderSettings();
+
     public abstract void GetColliders(QuantumStaticCollider2DBakeContext context);
   }
   
@@ -24001,7 +25174,7 @@ namespace Quantum {
       
     public StaticColliderData MakeStaticData(GameObject gameObject, QuantumStaticColliderSettings settings) {
       return new StaticColliderData {
-        Asset         = settings.Asset,
+        Asset         = settings.UserAsset,
         Name          = gameObject.name,
         Tag           = gameObject.tag,
         Layer         = gameObject.layer,
@@ -24028,6 +25201,17 @@ namespace Quantum {
 
   /// <summary/>
   public abstract class QuantumStaticCollider3DSource : QuantumMonoBehaviour {
+#if QUANTUM_ENABLE_ADDON_NAVIGATION
+    // not serialized, only used during baking to carry data to map static collider data
+    public QNavMeshStaticColliderData QNavMeshData { get; set; }
+#endif
+
+    /// <summary>
+    /// Additional static collider settings.
+    /// </summary>
+    [InlineHelp, DrawInline]
+    public QuantumStaticColliderSettings Settings = new QuantumStaticColliderSettings();
+
     public abstract void GetColliders(QuantumStaticCollider3DBakeContext context);
   }
   
@@ -24051,7 +25235,7 @@ namespace Quantum {
       
     public StaticColliderData MakeStaticData(GameObject gameObject, QuantumStaticColliderSettings settings) {
       return new StaticColliderData {
-        Asset         = settings.Asset,
+        Asset         = settings.UserAsset,
         Name          = gameObject.name,
         Tag           = gameObject.tag,
         Layer         = gameObject.layer,
@@ -24071,17 +25255,50 @@ namespace Quantum {
 
 #region Assets/Photon/Quantum/Runtime/QuantumStaticColliderSettings.cs
 
+// ReSharper disable InconsistentNaming
 namespace Quantum {
   using System;
+  using UnityEngine.Serialization;
 
+  /// <summary>
+  /// Authoring settings shared by all static collider source components, baked into the map's static collider data.
+  /// </summary>
   [Serializable]
   public class QuantumStaticColliderSettings {
-    public PhysicsCommon.StaticColliderMutableMode MutableMode;
-    public Quantum.AssetRef<Quantum.PhysicsMaterial> PhysicsMaterial;
-    public AssetRef Asset;
-
+    /// <summary>
+    /// If enabled, static collider reports overlaps but generates no physical collision response.
+    /// </summary>
+    [InlineHelp]
     [DrawIf("^SourceCollider", 0, ErrorOnConditionMemberNotFound = false)]
     public Boolean Trigger;
+
+    /// <summary>
+    /// Controls whether the baked static collider can be toggled on/off at runtime, and its initial enabled state.
+    /// </summary>
+    [InlineHelp]
+    public PhysicsCommon.StaticColliderMutableMode MutableMode;
+
+    /// <summary>
+    /// The physics material asset defining the collider's friction and restitution. If unassigned, the default physics material is used.
+    /// </summary>
+    [InlineHelp]
+    public AssetRef<Quantum.PhysicsMaterial> PhysicsMaterial;
+
+    /// <summary>
+    /// Optional user asset linked to the baked static collider, retrievable at runtime via the collider's static data. Unassigned by default.
+    /// </summary>
+    [InlineHelp]
+    [FormerlySerializedAs("Asset")]
+    public AssetRef UserAsset;
+
+    /// <summary>
+    /// Obsolete alias for <see cref="UserAsset"/>.
+    /// </summary>
+    [Obsolete("Use UserAsset instead.")]
+    public AssetRef Asset {
+      get => UserAsset;
+      set => UserAsset = value;
+    }
   }
 }
 
@@ -24122,7 +25339,10 @@ namespace Quantum {
 
         // init debug draw functions
 #if UNITY_EDITOR || QUANTUM_DRAW_SHAPES 
-        if (DebugDraw.IsDevelopmentBuild) {
+#if !UNITY_EDITOR
+        if (DebugDraw.IsDevelopmentBuild)
+#endif 
+        { 
           Draw.Init(DebugDraw.Ray, DebugDraw.Line, DebugDraw.Circle, DebugDraw.Sphere, DebugDraw.Rectangle, DebugDraw.Box, DebugDraw.Capsule, DebugDraw.Text, DebugDraw.Clear);
         }
 #endif
@@ -24267,7 +25487,7 @@ namespace Quantum {
       
       var globalEntityView = QuantumUnityDB.GetGlobalAsset(guid) as EntityView;
       if (globalEntityView == null) {
-        throw new InvalidOperationException($"Unable to resolve prefab for guid {guid}");
+        throw new InvalidOperationException($"Unable to resolve prefab for guid {guid.ToString()}");
       }
     
       return globalEntityView.Prefab;
@@ -24569,18 +25789,10 @@ namespace Quantum {
   /// are loaded is driven by usages of <see cref="QuantumGlobalScriptableObjectSourceAttribute"/> attributes. 
   /// </summary>
   public abstract class QuantumGlobalScriptableObject : QuantumScriptableObject {
-    private static IEnumerable<T> GetAssemblyAttributes<T>() where T : Attribute {
-      foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()) {
-        foreach (var attr in assembly.GetCustomAttributes<T>()) {
-          yield return attr;
-        }
-      }
-    }
-
     internal static QuantumGlobalScriptableObjectSourceAttribute[] SourceAttributes => s_sourceAttributes.Value;
 
     private static readonly Lazy<QuantumGlobalScriptableObjectSourceAttribute[]> s_sourceAttributes = new Lazy<QuantumGlobalScriptableObjectSourceAttribute[]>(() => {
-      return GetAssemblyAttributes<QuantumGlobalScriptableObjectSourceAttribute>().OrderBy(x => x.Order).ToArray();
+      return QuantumPlatform.GetLoadedAssemblyAttributes<QuantumGlobalScriptableObjectSourceAttribute>().OrderBy(x => x.Order).ToArray();
     });
 
     /// <summary>
@@ -24590,6 +25802,10 @@ namespace Quantum {
     /// </summary>
     internal static readonly HashSet<Type> _typesFailedToLoad = new(new TypeFullNameComparer());
 
+    /// <summary>
+    /// Use to clear internal list marking specific type as unable to load. Types might be unable to load during bootstrap, so cleaning the list
+    /// in some static initializer is a good way to ensure things can recover.
+    /// </summary>
     public static void ClearTypesFailedToLoad() {
       _typesFailedToLoad.Clear();
     }
@@ -25290,7 +26506,13 @@ namespace Quantum {
     /// <see cref="JsonUtilityExtensions.ToJsonWithTypeAnnotation(object,Quantum.JsonUtilityExtensions.InstanceIDHandlerDelegate)"/>
     public delegate string TypeSerializerDelegate(Type type);
     /// <see cref="JsonUtilityExtensions.ToJsonWithTypeAnnotation(object,Quantum.JsonUtilityExtensions.InstanceIDHandlerDelegate)"/>
-    public delegate string InstanceIDHandlerDelegate(object context, int value);
+    public delegate string InstanceIDHandlerDelegate(object context,
+#if UNITY_6000_3_OR_NEWER
+      EntityId value
+#else
+      int value
+#endif
+      );
 
     private const string TypePropertyName = "$type";
 
@@ -25523,8 +26745,14 @@ namespace Quantum {
             // parse the number that follows; may be negative
             var start = nextInstanceId + prefix.Length;
             var end = json.IndexOf('}', start);
-            var instanceId = int.Parse(json.AsSpan(start, end - start));
-
+            var idSpan = json.AsSpan(start, end - start);
+#if UNITY_6000_4_OR_NEWER
+            var instanceId = EntityId.FromULong(ulong.Parse(idSpan));
+#elif UNITY_6000_3_OR_NEWER
+            var instanceId = (EntityId)int.Parse(idSpan);
+#else
+            var instanceId = int.Parse(idSpan);
+#endif
             // append that part
             writer.Write(json.AsSpan(i, nextInstanceId - i));
             writer.Write(instanceIDHandler(obj, instanceId));
@@ -26149,7 +27377,7 @@ namespace Quantum {
   /// <summary>
   /// Quantum Unity paths.
   /// </summary>
-  public static class QuantumUnityEditorPaths {
+  public static partial class QuantumUnityEditorPaths {
     /// <summary>
     /// Root folder of Quantum installation.
     /// </summary>
@@ -26329,6 +27557,12 @@ namespace Quantum {
   using UnityEngine.Pool;
   using UnityEngine.SceneManagement;
 
+#if UNITY_6000_3_OR_NEWER
+  using ObjectIdType = UnityEngine.EntityId;
+#else
+  using ObjectIdType = System.Int32;
+#endif
+  
   /// <summary>
   /// Extension and utility methods for <see cref="SceneManager"/> and <see cref="Scene"/> types.
   /// </summary>
@@ -26407,6 +27641,31 @@ namespace Quantum {
       return false;
     }
 
+    /// <summary>
+    /// Gets the raw handle of a <paramref name="scene"/>
+    /// </summary>
+    public static ulong GetRawHandle(this Scene scene) {
+#if UNITY_6000_4_OR_NEWER
+      return scene.handle.GetRawData();
+#else
+      return (ulong)scene.handle;
+#endif
+    }
+
+    /// <summary>
+    /// Compares the object id to the internal handle of <paramref name="scene"/>
+    /// </summary>
+    public static int CompareRawHandle(this Scene scene, ObjectIdType id) {
+#if UNITY_6000_4_OR_NEWER
+      var idRaw = EntityId.ToULong(id);
+#elif UNITY_6000_3_OR_NEWER
+      var idRaw = (ulong)(int)id;
+#else
+      var idRaw = (ulong)id;
+#endif
+      return scene.GetRawHandle().CompareTo(idRaw);
+    }
+    
     /// <summary>
     /// Converts <paramref name="scene"/> into string, dumping all its fields and properties.
     /// </summary>
@@ -26572,6 +27831,20 @@ namespace Quantum {
 #endregion
 
 
+
+#endregion
+
+
+#region Assets/Photon/Quantum/Runtime/QuantumUnityUtility.Partial.cs
+
+namespace Quantum {
+  using System;
+
+  [Obsolete("Use QuantumEditorSettings.SdkRoot instead")]
+  partial class QuantumUnityEditorPaths {
+    
+  }
+}
 
 #endregion
 
@@ -27155,17 +28428,19 @@ namespace Quantum {
     public static void DrawAll() {
     }
 
+#pragma warning disable UAC0009 // deffed out DEVELOPMENT_BUILD still raises a complaint
     internal static bool IsDevelopmentBuild =>
 #if UNITY_6000_6_OR_NEWER
-      // to change this value, a clean build in required, it's less idea
+      // this property is a bit unreliable, requires clean build receive an update.
       Debug.isDebugBuild;
-#else 
+#else
 #if DEVELOPMENT_BUILD
       true;
 #else
       false;
 #endif
 #endif
+#pragma warning restore UAC0009
 
     internal static void OnGUI() {
 #if !UNITY_EDITOR && QUANTUM_DRAW_SHAPES

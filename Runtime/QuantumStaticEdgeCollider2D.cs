@@ -36,11 +36,6 @@ namespace Quantum {
     /// </summary>
     [InlineHelp] 
     public FP Height;
-    /// <summary>
-    /// Additional static collider settings.
-    /// </summary>
-    [InlineHelp, DrawInline, Space]
-    public QuantumStaticColliderSettings Settings = new QuantumStaticColliderSettings();
 
     private void OnValidate() {
       Height = FPMath.Clamp(Height, 0, Height);

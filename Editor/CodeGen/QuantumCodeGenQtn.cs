@@ -18,9 +18,8 @@ namespace Quantum.Editor {
     /// Runs the Quantum CodeGen for all <see cref="QuantumQtnAsset"/> in the project with default settings. Can be invoked with
     /// command line argument (-executeMethod Quantum.Editor.QuantumCodeGenQtn.Run).
     /// </summary>
-    /// <seealso cref="QuantumCodeGenSettings.DefaultOptions"/>
     public static void Run() {
-      Run(verbose: false);
+      Run(verbose: QuantumCodeGenQtnSettings.Instance.LogVerbose);
     }
     
     /// <summary>
@@ -28,7 +27,6 @@ namespace Quantum.Editor {
     /// </summary>
     /// <param name="qtnFiles">Qtn files to be analyzed</param>
     /// <param name="verbose">Log verbose output</param>
-    /// <seealso cref="QuantumCodeGenSettings.DefaultOptions"/>
     public static void Run(string[] qtnFiles, bool verbose) {
       Run(qtnFiles, verbose, null);
     }
@@ -40,7 +38,7 @@ namespace Quantum.Editor {
     /// <param name="verbose">Log verbose output</param>
     /// <param name="options">CodeGen options</param>
     public static void Run(string[] qtnFiles, bool verbose, GeneratorOptions options) {
-      Run(qtnFiles, verbose, options, QuantumCodeGenSettings.CodeGenQtnFolderPath, QuantumCodeGenSettings.CodeGenUnityRuntimeFolderPath);
+      Run(qtnFiles, verbose, options, QuantumCodeGenQtnSettings.Instance.SimulationOutputPath, QuantumCodeGenQtnSettings.Instance.ViewOutputPath);
     }
 
     /// <summary>
@@ -81,7 +79,7 @@ namespace Quantum.Editor {
       
       IEnumerable<GeneratorOutputFile> outputFiles;
       try {
-        outputFiles = Generator.Generate(qtnFiles, options ?? QuantumCodeGenSettings.Options, warning => {
+        outputFiles = Generator.Generate(qtnFiles, options ?? QuantumCodeGenQtnSettings.Instance.GeneratorOptions, warning => {
           string msg = "";
           if (!string.IsNullOrEmpty(warning.Path)) {
             msg += $"{warning.Path}({warning.Position}): ";
@@ -120,7 +118,7 @@ namespace Quantum.Editor {
           
         if (!string.IsNullOrEmpty(unityRuntimeOutputFolder)) {
           UpdateScriptsDirectory(unityRuntimeOutputFolder, groups[true], logVerbose, deleteOrphanedFiles, p => {
-            if (!QuantumCodeGenSettings.IsMigrationEnabled) {
+            if (!QuantumCodeGenQtnSettings.IsMigrationEnabled) {
               return false;
             }
             
@@ -169,7 +167,6 @@ namespace Quantum.Editor {
     /// Runs the Quantum CodeGen for all <see cref="QuantumQtnAsset"/> in the project with default settings.
     /// </summary>
     /// <param name="verbose">Log verbose output</param>
-    /// <seealso cref="QuantumCodeGenSettings.DefaultOptions"/>
     public static void Run(bool verbose) {
       Run(verbose, null);
     }
@@ -278,7 +275,7 @@ namespace Quantum.Editor {
       var assembly = typeof(Generator).Assembly;
       Guid onDiskGuid;
       try {
-        onDiskGuid = Quantum.CodeGen.DllUtils.ReadModuleVersionId(assembly.Location);
+        onDiskGuid = Quantum.CodeGen.DllUtils.ReadModuleVersionId(QuantumPlatform.GetLoadedPath(assembly));
       } catch (Exception ex) {
         QuantumEditorLog.Warn($"Error while trying to read CodeGen assembly MVID, assuming DLL is up to date: {ex}");
         return true;
@@ -288,12 +285,14 @@ namespace Quantum.Editor {
     }
 #endif
 
-    [MenuItem("Tools/Quantum/CodeGen/Run Qtn CodeGen", priority = QuantumCodeGenSettings.MenuPriority + 1)]
+    const int MenuPriority = 4000;
+    
+    [MenuItem("Tools/Quantum/CodeGen/Run Qtn CodeGen", priority = MenuPriority + 1)]
     static void MenuItemRunNonVerbose() {
       Run(false);
     }
     
-    [MenuItem("Tools/Quantum/CodeGen/Run Qtn CodeGen (verbose)", priority = QuantumCodeGenSettings.MenuPriority + 2)]
+    [MenuItem("Tools/Quantum/CodeGen/Run Qtn CodeGen (verbose)", priority = MenuPriority + 2)]
     static void MenuItemRunVerbose() {
       Run(true);
     }

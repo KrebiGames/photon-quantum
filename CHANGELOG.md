@@ -49,6 +49,180 @@ Disclaimer: The Quantum SDK 3.1.0 development snapshots are not intended to be u
 - `QuantumUnityDB` does not throw exceptions in `TryGet*` methods if the DB was failed to be loaded
 - `QuantumCallbackHandler_UnityCallbacks.LoadAddressableScenePathsAsync` is now static
 
+### Build 2139 (Jul 14, 2026)
+
+**Bug Fixes**
+
+- Fixed: An issue in 2D Physics when removing a `PhysicsCallbacks2D` component from an entity during collision callbacks, which could cause such entity to use the wrong callback flags on that frame
+
+### Build 2134 (Jul 09, 2026)
+
+**Changes**
+
+- `BakeCacheRoot` is now available as editor setting (needs `QUANTUM_ENABLE_QMAP`)
+
+**Bug Fixes**
+
+- Fixed: Invalid check in `QuantumEditorAutoBaker` when using Build auto-bake triggers
+
+### Build 2133 (Jul 08, 2026)
+
+**What's New**
+
+- Quantum state inspector now shows if a component on an entity is a table component
+
+**Bug Fixes**
+
+- Fixed: AssetBundle builds occasionally not being detected if `Build` auto-bake trigger is used
+
+### Build 2132 (Jul 07, 2026)
+
+**Bug Fixes**
+
+- Fixed: `NullReferenceException` when setting up a new Quantum scene
+
+### Build 2130 (Jul 06, 2026)
+
+**Bug Fixes**
+
+- Fixed: The Quantum icon is rendered for the gizmo overlay again for Unity version 2022.3+
+- Fixed: Issues with false navmesh border generation, enable QuantumNavMesh.ImportSettings.RepairSeams on the navmesh import script
+
+### Build 2128 (Jul 03, 2026)
+
+**Bug Fixes**
+
+- Fixed: Baking `qmap` immediately imports file in BakeCache if they've just been created
+
+### Build 2127 (Jul 02, 2026)
+
+**Bug Fixes**
+
+- Fixed: An issue in the 2D navmesh agent internal steering that caused right and left steering to use a slightly different rotation speed
+- Fixed: An issue where navmesh agents that failed their search can influence other agent waypoint detection
+
+### Build 2124 (Jul 01, 2026)
+
+**Changes**
+
+- `QuantumStaticColliderSettings` fields in concrete static collider components were moved to their respective base class `QuantumStaticCollider2D/3DSource`
+- `QuantumStaticColliderSettings.Asset` was renamed to `.UserAsset`
+
+**Bug Fixes**
+
+- Fixed: Regression introduced in Build 2076 that would cause static primitive colliders to scale their position offset with abs scale instead of signed
+
+### Build 2119 (Jun 30, 2026)
+
+**Changes**
+
+- JsonUtilityExtensions.InstanceIDHandlerDelegate now uses `EntityId` for Unity 6000.3+
+
+**Bug Fixes**
+
+- Fixed: A regression that caused `Draw.Shape()` to not draw gizmos in the editor
+
+### Build 2118 (Jun 29, 2026)
+
+**Bug Fixes**
+
+- Fixed: Issue when baking static mesh colliders with N degenerate triangles causing the last N triangles to be dropped from the baked mesh
+- Fixed: An issue that caused the Unity navmesh data to be saved on the Unity scene instead of on a separate asset during map baking
+- Fixed: An issue that caused the imported Asteroids sample to have broken materials for Unity 6.5+
+
+### Build 2112 (Jun 26, 2026)
+
+**Improvements**
+
+- Warn messages logged when degenerate triangles are found during `QuantumStaticMeshCollider3D` baking now include the name of the GameObject
+
+### Build 2110 (Jun 24, 2026)
+
+**What's New**
+
+- New `CharacterJoint3D` type, useful for creating ragdolls and ball-and-socket constraints. Configurable via `PhysicsJoint3D` component prototype
+- `QuantumRagdoll` MonoBehavior: a wizard-like component to help creating ragdolls and updating their view elements based on simulation state
+- A template ragdoll can now be created by right-clicking in editor Hierarchy > Quantum > 3D > Ragdoll Entity
+
+**Changes**
+
+- `FPQuaternion.FromToRotation` changed how it disambiguates rotation of opposite from/to vectors, now matching Unity 6.5+ standard
+- Restored `Bake All` button for `QuantumMapData` using `qmap`
+
+**Bug Fixes**
+
+- Fixed: DivisionByZero exception in `FPQuaternion.RotateTowards` when quaternions are almost identical or non-normalized AND `maxDegreesDelta` is negative
+- Fixed: An issue with 3D capsule-triangle collision detection that was causing false-negatives in certain conditions
+- Fixed: Memory leak when using Trace Allocations as Frame Heap tracking mode
+
+### Build 2104 (Jun 19, 2026)
+
+**Changes**
+
+- The instant replay script now reuses its runner for consecutive replays
+
+**Bug Fixes**
+
+- Fixed: An issue with the `QuantumRunnerRegistry`  that allowed adding the same runner multiple times
+
+### Build 2099 (Jun 17, 2026)
+
+**Bug Fixes**
+
+- Fixed: `QuantumCodeGenSettings` migration from partial type using invalid `ViewOutputPath`
+
+### Build 2096 (Jun 17, 2026)
+
+**What's New**
+
+- TerrainCollider asset is now optional. Leaving a `QuantumStaticTerrainCollider3D.Asset` field empty will make the terrain data be baked directly and only to the map mesh data, without saving an intermediary FP-based heightmap on the asset as before
+- QuantumHeightMap is a new class (not an AssetObject) that provides basic FP-based heightmap storage and operations, which used to be covered only by a TerrainCollider asset
+- Terrain colliders can now be automatically baked along with map colliders and prototypes, configurable in Quantum Editor Settings
+
+**Changes**
+
+- Updating Third Party Notices
+
+### Build 2095 (Jun 16, 2026)
+
+**Changes**
+
+- Upgrading Photon Realtime to version `5.1.15`
+
+**Bug Fixes**
+
+- Fixed: Compile errors if `com.unity.modules.assetbundle` is not used - a version define `QUANTUM_ENABLE_ASSET_BUNDLE_ASSET_SOURCE` was added to relevant asmdefs
+- Fixed: Regression in 2D and 3D Physics callbacks that could cause desyncs due to OnEnter callbacks being called in late-joiners
+- Fixed: An issue that caused stepping the editor in paused play mode to not play back exactly one Quantum tick
+
+### Build 2089 (Jun 12, 2026)
+
+**What's New**
+
+- `QuantumCodeGenQtnSettings` - contains all the settings used for Qtn codegen. Editable in Project Settings window
+- `QuantumEditorSettings.SdkRoot`
+- `QuantumEditorSettings.GetSdkPath(string relative)`
+
+**Changes**
+
+- `QuantumCodeGenSettings` is now obsolete
+- `AssetGuidOverrideDependency` dependency is updated on saving `QuantumEditorSettings`
+- Overrides live outside the AssetDatabase now, so saving them refreshes the override dependency on its own, separately from the asset hash dependency - two import waves instead of one coalesced
+- `QuantumUnityEditorPaths` is now obsolete
+
+**Bug Fixes**
+
+- Fixed: An issue that would allow a Unity `TerrainCollider` to be assigned to a `QuantumStaticTerrainCollider3D.Asset` field on inspector
+- Fixed: OnSettingsGUI override access modifier across assemblies
+- Fixed: Base lives in Quantum.Unity.Editor.CodeGen, override in
+- Fixed: Quantum.Unity.Editor; for a protected-internal base member the
+- Fixed: Cross-assembly override must drop the internal portion
+- Fixed: Rebuild AssetGuidOverrides dictionary after JSON load
+- Fixed: JsonUtility.FromJsonOverwrite does not re-fire OnEnable, so the
+- Fixed: _assetIdToAssetGuidOverride dictionary stayed empty after Load
+- Fixed: Breaking TryGetAssetGuidOverride/SetGuidOverride lookups
+- Fixed: Implements ISerializationCallbackReceiver to rebuild on deserialize
+
 ### Build 2085 (Jun 06, 2026)
 
 **What's New**

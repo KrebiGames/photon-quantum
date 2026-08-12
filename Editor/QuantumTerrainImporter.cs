@@ -47,7 +47,7 @@ namespace Quantum.Editor {
     }
 
     internal static void Import(Quantum.TerrainCollider asset, TerrainData terrainData, TerrainBakeResolutionDivisor bakeResDivisor) {
-      QuantumStaticTerrainCollider3D.Bake(asset, terrainData, bakeResDivisor);
+      asset.QHeightMap = QuantumStaticTerrainCollider3D.Bake(terrainData, bakeResDivisor);
     }
   }
 #endif

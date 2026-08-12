@@ -8324,6 +8324,64 @@
             <param name="connectedAnchorEntityRef">An optional entity to which the joint entity is connected to. See <see cref="F:Quantum.Prototypes.Joint2DConfig.ConnectedEntity"/>.</param>
             <returns>The materialized <see cref="T:Quantum.Physics2D.Joint"/>.</returns>
         </member>
+        <member name="T:Quantum.Prototypes.CharacterJoint3DConfig">
+            <summary>
+            Defines a prototype of a <see cref="T:Quantum.Physics3D.Joint3D"/> struct of type <see cref="F:Quantum.Physics3D.JointType3D.CharacterJoint"/>.
+            </summary>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.StartDisabled">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.StartDisabled"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.UserTag">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.UserTag"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.ConnectedEntity">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.ConnectedEntity"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.ConnectedAnchor">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.ConnectedAnchor"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.Anchor">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.Anchor"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.SwingAxis">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.SwingAxis"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.TwistAxis">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.TwistAxis"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.Swing1AngleLimits">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.Swing1AngleLimits"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.Swing2AngleLimits">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.Swing2AngleLimits"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.UseTwistAngleLimits">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.UseTwistAngleLimits"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.TwistLowerAngle">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.TwistLowerAngle"/>
+        </member>
+        <member name="F:Quantum.Prototypes.CharacterJoint3DConfig.TwistUpperAngle">
+            <inheritdoc cref="F:Quantum.Prototypes.Joint3DConfig.TwistUpperAngle"/>
+        </member>
+        <member name="M:Quantum.Prototypes.CharacterJoint3DConfig.Materialize(Quantum.Core.FrameBase,Quantum.Physics3D.Joint3D@,Quantum.PrototypeMaterializationContext@)">
+            <summary>
+            Materializes this joint prototype into a <paramref name="joint"/> instance.
+            </summary>
+            <param name="frame">The frame in which this prototype is being materialized.</param>
+            <param name="joint">The <see cref="T:Quantum.Physics3D.Joint3D"/> resultant of this materialization.</param>
+            <param name="context">The <see cref="T:Quantum.PrototypeMaterializationContext"/> in which this prototype is being materialized.</param>
+        </member>
+        <member name="M:Quantum.Prototypes.CharacterJoint3DConfig.Materialize(Quantum.Core.FrameBase,Quantum.Physics3D.Joint3D@,Quantum.EntityRef,Quantum.EntityRef)">
+            <inheritdoc cref="M:Quantum.Prototypes.Joint3DConfig.Materialize(Quantum.Core.FrameBase,Quantum.Physics3D.Joint3D@,Quantum.EntityRef,Quantum.EntityRef)"/>
+        </member>
+        <member name="M:Quantum.Prototypes.CharacterJoint3DConfig.CreateJoint(Quantum.Core.FrameBase)">
+            <inheritdoc cref="M:Quantum.Prototypes.Joint3DConfig.CreateJoint(Quantum.Core.FrameBase)"/>
+        </member>
+        <member name="M:Quantum.Prototypes.CharacterJoint3DConfig.CreateJoint(Quantum.Core.FrameBase,Quantum.EntityRef,Quantum.EntityRef)">
+            <inheritdoc cref="M:Quantum.Prototypes.Joint3DConfig.CreateJoint(Quantum.Core.FrameBase,Quantum.EntityRef,Quantum.EntityRef)"/>
+        </member>
         <member name="T:Quantum.Prototypes.Joint3DConfig">
             <summary>
             Defines a prototype of a <see cref="T:Quantum.Physics3D.Joint3D"/> struct of any type.
@@ -8363,6 +8421,14 @@
             <summary>
             Axis around which the joint rotates, defined in the local space of the entity.
             The vector is normalized before set. If zeroed, FPVector3.Right is used instead.
+            </summary>
+        </member>
+        <member name="F:Quantum.Prototypes.Joint3DConfig.SwingAxis">
+            <summary>
+            </summary>
+        </member>
+        <member name="F:Quantum.Prototypes.Joint3DConfig.TwistAxis">
+            <summary>
             </summary>
         </member>
         <member name="F:Quantum.Prototypes.Joint3DConfig.Frequency">
@@ -8410,6 +8476,26 @@
             <summary>
             The upper limiting  angle of the allowed arc of rotation around the connected anchor, in degrees.
             <seealso cref="F:Quantum.Physics3D.HingeJoint3D.UpperLimitRad"/>
+            </summary>
+        </member>
+        <member name="F:Quantum.Prototypes.Joint3DConfig.UseTwistAngleLimits">
+            <summary>
+            </summary>
+        </member>
+        <member name="F:Quantum.Prototypes.Joint3DConfig.TwistLowerAngle">
+            <summary>
+            </summary>
+        </member>
+        <member name="F:Quantum.Prototypes.Joint3DConfig.TwistUpperAngle">
+            <summary>
+            </summary>
+        </member>
+        <member name="F:Quantum.Prototypes.Joint3DConfig.Swing1AngleLimits">
+            <summary>
+            </summary>
+        </member>
+        <member name="F:Quantum.Prototypes.Joint3DConfig.Swing2AngleLimits">
+            <summary>
             </summary>
         </member>
         <member name="F:Quantum.Prototypes.Joint3DConfig.UseMotor">
@@ -12866,6 +12952,22 @@
             The asset dispose callback to release memory.
             </summary>
         </member>
+        <member name="T:Quantum.QNavMeshStaticColliderData">
+            <summary>
+            Saves an area and flags that can be used to generate a navmesh from the Quantum map static colliders.
+            Only used by the Navigation addon.
+            </summary>
+        </member>
+        <member name="F:Quantum.QNavMeshStaticColliderData.Area">
+            <summary>
+            QNavMesh area, Unity navmesh area parity.
+            </summary>
+        </member>
+        <member name="F:Quantum.QNavMeshStaticColliderData.Flags">
+            <summary>
+            QNavMesh collider flags.
+            </summary>
+        </member>
         <member name="T:Quantum.MapStaticCollider3D">
             <summary>
             The data structure to hold 3D static colliders for a Quantum map.
@@ -12921,6 +13023,11 @@
         <member name="F:Quantum.MapStaticCollider3D.StaticData">
             <summary>
             Static collider meta data.
+            </summary>
+        </member>
+        <member name="F:Quantum.MapStaticCollider3D.QNavMeshData">
+            <summary>
+            QNavMesh metadata, only used by the Navigation addon.
             </summary>
         </member>
         <member name="P:Quantum.MapStaticCollider3D.CapsuleExtent">
@@ -20009,6 +20116,44 @@
             two tetrahedra volumes, in which case the x6 cancel each other.
             </summary>
         </member>
+        <member name="T:Quantum.Physics3D.CharacterJoint3D">
+            <summary>
+            A <see cref="T:Quantum.Physics3D.Joint3D"/> that attaches a Physics Body to an anchor around which it can rotate.
+            The connected anchor can be a world-space position or another entity with at least a transform component.
+            The rotation can happen freely or, optionally, with limiting angles and/or a motor torque.
+            </summary>
+            \ingroup PhysicsJoints3D
+        </member>
+        <member name="F:Quantum.Physics3D.CharacterJoint3D.SIZE">
+            <summary>
+            The size of the struct in bytes.
+            </summary>
+        </member>
+        <member name="F:Quantum.Physics3D.CharacterJoint3D.ConnectedEntity">
+            <inheritdoc cref="F:Quantum.Physics3D.Joint3D.ConnectedEntity"/>
+            @copydoc Joint3D.ConnectedEntity
+        </member>
+        <member name="F:Quantum.Physics3D.CharacterJoint3D.Anchor">
+            <inheritdoc cref="F:Quantum.Physics3D.Joint3D.Anchor"/>
+            @copydoc Joint3D.Anchor
+        </member>
+        <member name="F:Quantum.Physics3D.CharacterJoint3D.ConnectedAnchor">
+            <inheritdoc cref="F:Quantum.Physics3D.Joint3D.ConnectedAnchor"/>
+            @copydoc Joint3D.ConnectedAnchor
+        </member>
+        <member name="M:Quantum.Physics3D.CharacterJoint3D.Serialize(System.Void*,Quantum.FrameSerializer)">
+            <summary>
+            Serializes a <see cref="T:Quantum.Physics3D.CharacterJoint3D"/> into a <see cref="T:Quantum.FrameSerializer"/>.
+            </summary>
+            <param name="ptr">The pointer to the <see cref="T:Quantum.Physics3D.CharacterJoint3D"/>.</param>
+            <param name="serializer">The <see cref="T:Quantum.FrameSerializer"/> instance into which the struct will be serialized.</param>
+        </member>
+        <member name="M:Quantum.Physics3D.CharacterJoint3D.GetHashCode">
+            <summary>
+            Overrides the hash code generation of this type.
+            </summary>
+            <returns>A hash code of the current state of this instance.</returns>
+        </member>
         <member name="T:Quantum.Physics3D.JointType3D">
             <summary>
             Defines the type of a 3D <see cref="T:Quantum.Physics3D.Joint3D"/>.
@@ -20033,6 +20178,11 @@
         <member name="F:Quantum.Physics3D.JointType3D.HingeJoint">
             <summary>
             Defines the type of a <see cref="T:Quantum.Physics3D.HingeJoint3D"/>.
+            </summary>
+        </member>
+        <member name="F:Quantum.Physics3D.JointType3D.CharacterJoint">
+            <summary>
+            Defines the type of a <see cref="T:Quantum.Physics3D.CharacterJoint3D"/>.
             </summary>
         </member>
         <member name="T:Quantum.Physics3D.Joint3D">
@@ -20091,6 +20241,15 @@
         <member name="F:Quantum.Physics3D.Joint3D.HingeJoint">
             <summary>
             Type-specific settings of a joint of type <see cref="F:Quantum.Physics3D.JointType3D.HingeJoint"/>.
+            <remarks>
+            Different types of joints have their fields overlapping in memory.
+            Thus, settings of a type different than this joint's <see cref="P:Quantum.Physics3D.Joint3D.Type"/> might have fields with unexpected values.
+            </remarks>
+            </summary>
+        </member>
+        <member name="F:Quantum.Physics3D.Joint3D.CharacterJoint">
+            <summary>
+            Type-specific settings of a joint of type <see cref="F:Quantum.Physics3D.JointType3D.CharacterJoint"/>.
             <remarks>
             Different types of joints have their fields overlapping in memory.
             Thus, settings of a type different than this joint's <see cref="P:Quantum.Physics3D.Joint3D.Type"/> might have fields with unexpected values.
@@ -22139,13 +22298,14 @@
             <param name="frame">The frame.</param>
             <param name="triangle">The triangle reference to remove.</param>
         </member>
-        <member name="M:Quantum.MeshTriangleVerticesCcw.Create(System.Collections.Generic.IList{Photon.Deterministic.FPVector3},System.Collections.Generic.IList{System.Int32},System.Nullable{Photon.Deterministic.FPMatrix4x4})">
+        <member name="M:Quantum.MeshTriangleVerticesCcw.Create(System.Collections.Generic.IList{Photon.Deterministic.FPVector3},System.Collections.Generic.IList{System.Int32},System.Nullable{Photon.Deterministic.FPMatrix4x4},System.String)">
             <summary>
             Creates a new instance of <see cref="T:Quantum.MeshTriangleVerticesCcw"/> from a list of vertices and indices.
             </summary>
             <param name="vertices">The vertices of the mesh collider.</param>
             <param name="indices">The triangle indices of the mesh collider.</param>
             <param name="matrix4X4">The optional matrix to apply to the collider.</param>
+            <param name="context">Optional context logged in case degenerate triangles are found (e.g. GameObject name).</param>
             <returns>An instance of <see cref="T:Quantum.MeshTriangleVerticesCcw"/>.</returns>
         </member>
         <member name="T:Quantum.TriangleCCW.VertexHashMapper">
@@ -23274,6 +23434,12 @@
             When Physics Bodies have a very large Mass or Inertia, the inverse value of the perceived mass in contact points as computed by the Physics Solver might get very small and close to zero.
             Under such conditions, rounding errors become very significant and this can often be translated into impulse spikes.
             This setting functions as a minimum threshold to this inverse mass value, below which the value is clamped. Set to 0 to never clamp.
+            </summary>
+        </member>
+        <member name="F:Quantum.PhysicsCommon.Config.BaumgarteBetaValue">
+            <summary>
+            The character joint uses this value to adjust the velocity of the physics bodies based on their position and rotation.
+            A common range is between 0.1 and 0.2 for small corrections in a few connected bodies. Use values between 0.2 and 8.0 for more aggressive correction in multiple connected bodies.
             </summary>
         </member>
         <member name="F:Quantum.PhysicsCommon.Config.SimplexMinBitShift">
@@ -25410,9 +25576,25 @@
             </summary>
         </member>
         <member name="F:Quantum.QuantumPlatform.IsWebGL">
-            <summary>
-            
-            </summary>
+            <summary/>
+        </member>
+        <member name="M:Quantum.QuantumPlatform.GetLoadedAssemblies">
+            <summary/>
+        </member>
+        <member name="M:Quantum.QuantumPlatform.GetAnyAssemblyAttribute``1(System.Collections.Generic.IReadOnlyList{System.Reflection.Assembly})">
+            <summary/>
+        </member>
+        <member name="M:Quantum.QuantumPlatform.GetAssemblyAttributes``1(System.Collections.Generic.IReadOnlyList{System.Reflection.Assembly})">
+            <summary/>
+        </member>
+        <member name="M:Quantum.QuantumPlatform.GetAnyLoadedAssemblyAttribute``1">
+            <summary/>
+        </member>
+        <member name="M:Quantum.QuantumPlatform.GetLoadedAssemblyAttributes``1">
+            <summary/>
+        </member>
+        <member name="M:Quantum.QuantumPlatform.GetLoadedPath(System.Reflection.Assembly)">
+            <summary/>
         </member>
         <member name="T:Quantum.QuantumUnsafe">
             <summary>
@@ -25674,8 +25856,11 @@
         </member>
         <member name="M:Quantum.QuantumUnsafe.Copy(System.Void*,System.Void*,System.Int32)">
             <summary>
-            Copies a block of memory from the source to the destination.
+            Copies a block of memory from one location to another
             </summary>
+            <param name="destination">Do not pass a nullptr, the destination to be copied to</param>
+            <param name="source">Do not pass a nullptr, the source to be copied from</param>
+            <param name="size">The size of the data to be copied</param>
         </member>
         <member name="M:Quantum.QuantumUnsafe.Clear(System.Void*,System.Int32)">
             <summary>
@@ -28548,87 +28733,6 @@
             <param name="type">Type</param>
             <param name="size">Size</param>
         </member>
-        <member name="T:Quantum.TypeUtils">
-            <summary>
-            Type reflection utility methods. Is generally slow.
-            </summary>
-        </member>
-        <member name="M:Quantum.TypeUtils.GetSubClasses(System.Type,System.String[])">
-            <summary>
-            Get all types that are subclasses to the given type found inside the given assembly names.
-            </summary>
-            <param name="type">Input type</param>
-            <param name="assemblies">Assembly names to search</param>
-            <returns>A list of types that derive from the input type</returns>
-        </member>
-        <member name="M:Quantum.TypeUtils.GetSubClasses(System.Type,System.Reflection.Assembly[])">
-            <summary>
-            Get all types that are subclasses to the given type found inside the given assemblies.
-            </summary>
-            <param name="type">Input type</param>
-            <param name="assemblies">Assemblies to search</param>
-            <returns>A list of types that derive from the input type</returns>
-        </member>
-        <member name="M:Quantum.TypeUtils.GetSubClasses(System.Type,System.Reflection.Assembly)">
-            <summary>
-            Get all types that are subclasses to the given type found inside the assembly.
-            </summary>
-            <param name="type">Input type</param>
-            <param name="asm">Assembly to search</param>
-            <returns>A list of types that derive from the input type</returns>
-        </member>
-        <member name="M:Quantum.TypeUtils.GetTypesImplementingInterface(System.Type,System.Reflection.Assembly)">
-            <summary>
-            Get all types that are implementing the given interface found inside the assembly.
-            </summary>
-            <param name="type">Interface type</param>
-            <param name="asm">Assembly to search</param>
-            <returns>A list of types that derive from the input interface</returns>
-        </member>
-        <member name="M:Quantum.TypeUtils.GetTypesWithAttribute``1(System.String[])">
-            <summary>
-            Get all types annotated with the given attribute found inside the given assembly names.
-            </summary>
-            <typeparam name="T">Attribute type</typeparam>
-            <param name="assemblies">Assemblies to search</param>
-            <returns>A list of types with the given attribute</returns>
-        </member>
-        <member name="M:Quantum.TypeUtils.GetTypesWithAttribute``1(System.Reflection.Assembly)">
-            <summary>
-            Get all types annotated with the given attribute found inside the given assembly.
-            </summary>
-            <typeparam name="T">Attribute type</typeparam>
-            <param name="asm">Assembly to search</param>
-            <returns>A list of types with the given attribute</returns>
-        </member>
-        <member name="M:Quantum.TypeUtils.GetAttribute``1(System.Type)">
-            <summary>
-            Get an attribute from the type.
-            </summary>
-            <typeparam name="T">Attribute type</typeparam>
-            <param name="t">Type to check for the attribute</param>
-            <returns>The attribute or <see langword="null"/></returns>
-        </member>
-        <member name="M:Quantum.TypeUtils.FindType(System.String)">
-            <summary>
-            Find a type by a given name inside all loaded assemblies.
-            </summary>
-            <param name="typeName">Type name</param>
-            <returns>The type or <see langword="null"/> when not found</returns>
-        </member>
-        <member name="M:Quantum.TypeUtils.GetLoadableTypes(System.Reflection.Assembly)">
-            <summary>
-            Get a list of all types inside a given assembly.
-            </summary>
-            <param name="assembly">Assembly to search</param>
-            <returns>A list of all types from that assembly</returns>
-            <exception cref="T:System.ArgumentNullException">Is raised if the assembly is <see langword="null"/></exception>
-        </member>
-        <member name="M:Quantum.TypeUtils.ImplementsInterface(System.Type,System.Type)">
-            <summary>
-            Obsolete
-            </summary>
-        </member>
         <member name="M:Quantum.UnmanagedUtils.ByteToHex(System.Byte)">
             <summary>
             Converts a byte value to its hexadecimal representation.
@@ -28962,7 +29066,17 @@
             Copies bytes from the source address to the destination address.
             </summary>
         </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.CopyBlock(System.Byte@,System.Byte@,System.UInt32)">
+            <summary>
+            Copies bytes from the source address to the destination address.
+            </summary>
+        </member>
         <member name="M:System.Runtime.CompilerServices.Unsafe.CopyBlockUnaligned(System.Void*,System.Void*,System.UInt32)">
+            <summary>
+            Copies bytes from the source address to the destination address without assuming architecture dependent alignment of the addresses.
+            </summary>
+        </member>
+        <member name="M:System.Runtime.CompilerServices.Unsafe.CopyBlockUnaligned(System.Byte@,System.Byte@,System.UInt32)">
             <summary>
             Copies bytes from the source address to the destination address without assuming architecture dependent alignment of the addresses.
             </summary>
@@ -31488,6 +31602,17 @@
             <param name="segmentEndB">End point of segment B.</param>
             <returns></returns>
         </member>
+        <member name="M:Photon.Deterministic.FPCollision.ClosestPointBetweenSegments(Photon.Deterministic.FPVector3,Photon.Deterministic.FPVector3,Photon.Deterministic.FPVector3,Photon.Deterministic.FPVector3,Photon.Deterministic.FPVector3@,Photon.Deterministic.FPVector3@)">
+            <summary>
+            Computes the closes point in segment A to a segment B and the closest point in segment B to A.
+            </summary>
+            <param name="segmentStartA">Start point of segment A.</param>
+            <param name="segmentEndA">End point of segment A.</param>
+            <param name="segmentStartB">Start point of segment A.</param>
+            <param name="segmentEndB">End point of segment B.</param>
+            <param name="pointOnA">Closest point to B on segment A.</param>
+            <param name="pointOnB">Closest point to A on segment B.</param>
+        </member>
         <member name="T:Photon.Deterministic.FPHighPrecisionDivisor">
             <summary>
             Represents a high precision divisor for use with the Fixed Point math system.
@@ -33598,6 +33723,9 @@
         <member name="M:Photon.Deterministic.FPQuaternion.RotateTowards(Photon.Deterministic.FPQuaternion,Photon.Deterministic.FPQuaternion,Photon.Deterministic.FP)">
             <summary>
             Rotates a rotation <paramref name="from"/> towards <paramref name="to"/> by an angular step of <paramref name="maxDegreesDelta"/>.
+            <remarks>
+            Both <paramref name="from"/> and <paramref name="to"/> quaternions are assumed and expected to be normalized.
+            </remarks>
             </summary>
             <param name="from"></param>
             <param name="to"></param>

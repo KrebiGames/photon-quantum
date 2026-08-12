@@ -88,6 +88,16 @@
             "name": "com.unity.sharp-zip-lib",
             "expression": "1.0",
             "define": "QUANTUM_ENABLE_SHARPZIPLIB"
+        },
+        {
+            "name": "com.photonengine.quantum-navigation",
+            "expression": "1.0",
+            "define": "QUANTUM_ENABLE_ADDON_NAVIGATION"
+        },
+        {
+            "name": "com.unity.modules.assetbundle",
+            "expression": "1.0",
+            "define": "QUANTUM_ENABLE_ASSET_BUNDLE_ASSET_SOURCE"
         }
     ],
     "noEngineReferences": false

@@ -135,7 +135,7 @@
  Such library can be integrated into the main project:
  <list type="bullet">
  <item><description>Use <c>import component</c> to register components defined in the library.</description></item>
- <item><description>Call <c>StaticLibName.InitStaticDelegates</c> & <c>StaticLibName.RegisterSimulationTypes</c> to initialize the library in <c>Statics.InitStaticDelegatesUser</c> & <c>Simulation.RegisterTypesUser</c>, respectively.</description></item>
+ <item><description>Call <c>StaticLibName.InitStaticDelegates</c> and <c>StaticLibName.RegisterSimulationTypes</c> to initialize the library in <c>Statics.InitStaticDelegatesUser</c> and <c>Simulation.RegisterTypesUser</c>, respectively.</description></item>
  </list>
  </summary>
 </member>

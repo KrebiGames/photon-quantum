@@ -61,6 +61,7 @@ namespace Quantum {
     private float previousNormalizedTime;
 
     QuantumInstantReplay _instantReplay;
+    bool _isInstantReplayRunning;
     bool _isFading;
     float _fadingAlpha = 1.0f;
     Texture2D _fadingTexture;
@@ -78,11 +79,14 @@ namespace Quantum {
 
         if (c.Game == _instantReplay.LiveGame) {
           // main game was shut down, shut down replay
-          CleanUpReplay();
+          StopReplayIfRunning();
+          // Dispose replay runner and release memory
+          _instantReplay?.Dispose();
+          _instantReplay = null;
         } else if (c.Game == _instantReplay.ReplayGame) {
-          // this will be called if the replay runner is shut down outside this class.
-          // we can call shutdown() on the runner multiple times during the same frame.
-          CleanUpReplay();
+          // Replay runner is shutdown, then we expect the instant replay is also disposed there.
+          StopReplayIfRunning();
+          _instantReplay = null;
         }
       });
     }
@@ -97,7 +101,7 @@ namespace Quantum {
         QuantumRunner.Default.Game.StartRecordingInstantReplaySnapshots();
       }
 
-      if (_instantReplay != null) {
+      if (_isInstantReplayRunning) {
         if (_instantReplay.CanSeek) {
           if (previousNormalizedTime != NormalizedTime) {
             _instantReplay.SeekNormalizedTime(NormalizedTime);
@@ -107,31 +111,29 @@ namespace Quantum {
         if (_instantReplay.Update(Time.unscaledDeltaTime * PlaybackSpeed)) {
           previousNormalizedTime = NormalizedTime = _instantReplay.NormalizedTime;
         } else {
-          CleanUpReplay();
+          StopReplayIfRunning();
         }
       }
 
-      Button_StartInstantReplay = _instantReplay == null && QuantumRunner.Default != null;
-      Button_StopInstantReplay = _instantReplay != null;
-      IsReplayRunning = _instantReplay != null;
+      Button_StartInstantReplay = !_isInstantReplayRunning && QuantumRunner.Default != null;
+      Button_StopInstantReplay = _isInstantReplayRunning;
+      IsReplayRunning = _isInstantReplayRunning;
     }
 
-    private void CleanUpReplay() {
-      // set _instantReplay to null right away, because CallbackGameDestroyed is triggered from inside the runner shutdown
-      var temp = _instantReplay;
-      _instantReplay = null;
-      OnReplayStopped();
-      temp?.Dispose();
+    private void StopReplayIfRunning() {
+      if (_isInstantReplayRunning) {
+        _isInstantReplayRunning = false;
+        OnReplayStopped();
+      }
     }
 
     /// <summary>
     /// Unity OnDisabled event, disposes the instant replay data structures.
     /// </summary>
     public void OnDisable() {
-      if (_instantReplay != null && QuantumRunner.Default != null) {
-        _instantReplay.Dispose();
-        _instantReplay = null;
-      }
+      StopReplayIfRunning();
+      _instantReplay?.Dispose();
+      _instantReplay = null;
     }
 
     /// <summary>
@@ -147,7 +149,7 @@ namespace Quantum {
     /// Unity OnGUI event, displays the replay label and the replay slider.
     /// </summary>
     public void OnGUI() {
-      if (ShowReplayLabel && _instantReplay != null) {
+      if (ShowReplayLabel && _isInstantReplayRunning) {
         GUI.contentColor = Color.red;
         GUI.Label(new Rect(10, 30, 200, 100), "INSTANT REPLAY");
 
@@ -199,6 +201,8 @@ namespace Quantum {
 
     void OnReplayStopped() {
       Debug.LogFormat("### Stopping Quantum instant replay and resuming the live game ###");
+      
+      QuantumRunnerRegistry.Global.RemoveRunner(_instantReplay.ReplayRunner);
 
       var entityViewUpdater = FindAnyObjectByType<QuantumEntityViewUpdater>();
       if (entityViewUpdater != null) {
@@ -225,8 +229,10 @@ namespace Quantum {
     /// Is called from the inspector to start the instant replay.
     /// </summary>
     public void Editor_StartInstantReplay() {
-      if (_instantReplay == null && QuantumRunner.Default) {
-        _instantReplay = new QuantumInstantReplay(QuantumRunner.Default.Game, ReplayLengthSec, RewindMode, EnableLoop);
+      if (_isInstantReplayRunning == false && QuantumRunner.Default) {
+        _instantReplay ??= new QuantumInstantReplay();
+        _instantReplay.Run(QuantumRunner.Default.Game, ReplayLengthSec, RewindMode, EnableLoop);
+        _isInstantReplayRunning = true;
         OnReplayStarted(_instantReplay.ReplayGame);
       }
     }
@@ -235,8 +241,8 @@ namespace Quantum {
     /// Is called from the inspector to stop the instant replay.
     /// </summary>
     public void Editor_StopInstantReplay() {
-      if (_instantReplay != null) {
-        CleanUpReplay();
+      if (_isInstantReplayRunning) {
+        StopReplayIfRunning();
       }
     }
 
