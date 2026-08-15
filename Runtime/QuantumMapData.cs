@@ -58,20 +58,54 @@ namespace Quantum {
       get => SceneObjectReferences.Views;
     }
 
+    [FormerlySerializedAs(nameof(StaticCollider2DReferences))]
+    [SerializeField, HideInInspector]
+    private List<QuantumStaticCollider2DSource> _legacyStaticCollider2DReferences = new();
+    
+    [FormerlySerializedAs(nameof(StaticCollider3DReferences))]
+    [SerializeField, HideInInspector]
+    private List<QuantumStaticCollider3DSource> _legacyStaticCollider3DReferences = new();
+    
+    [FormerlySerializedAs(nameof(MapEntityReferences))]
+    [SerializeField, HideInInspector]
+    private List<QuantumEntityView> _legacyMapEntityReferences = new();
+
     [NonSerialized]
     private QuantumMapDataSceneObjectReferences _mapDataSceneObjectReferences;
-    
+
     internal QuantumMapDataSceneObjectReferences SceneObjectReferences {
       get {
         if (!_mapDataSceneObjectReferences) {
           if (!TryGetComponent(out _mapDataSceneObjectReferences)) {
             _mapDataSceneObjectReferences = gameObject.AddComponent<QuantumMapDataSceneObjectReferences>();
             _mapDataSceneObjectReferences.hideFlags = HideFlags.DontSaveInEditor | HideFlags.HideInInspector | HideFlags.NotEditable;
+            _mapDataSceneObjectReferences.StaticCollider2DReferences.AddRange(_legacyStaticCollider2DReferences);
+            _mapDataSceneObjectReferences.StaticCollider3DReferences.AddRange(_legacyStaticCollider3DReferences);
+            _mapDataSceneObjectReferences.Views.AddRange(_legacyMapEntityReferences);
           }
         }
         return _mapDataSceneObjectReferences;
       }
     }
+
+#if UNITY_EDITOR
+    internal void ClearLegacyColliderReferences() {
+      if (_legacyStaticCollider2DReferences.Count == 0 && _legacyStaticCollider3DReferences.Count == 0) {
+        return;
+      }
+      _legacyStaticCollider2DReferences.Clear();
+      _legacyStaticCollider3DReferences.Clear();
+      UnityEditor.EditorUtility.SetDirty(this);
+    }
+
+    internal void ClearLegacyMapEntityReferences() {
+      if (_legacyMapEntityReferences.Count == 0) {
+        return;
+      }
+      _legacyMapEntityReferences.Clear();
+      UnityEditor.EditorUtility.SetDirty(this);
+    }
+#endif
 #else
     /// <summary>
     /// One-to-one mapping of Quantum 2D static collider entries in QAssetMap to their original source scripts.

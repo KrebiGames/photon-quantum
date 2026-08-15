@@ -49,6 +49,71 @@ Disclaimer: The Quantum SDK 3.1.0 development snapshots are not intended to be u
 - `QuantumUnityDB` does not throw exceptions in `TryGet*` methods if the DB was failed to be loaded
 - `QuantumCallbackHandler_UnityCallbacks.LoadAddressableScenePathsAsync` is now static
 
+### Build 2176 (Aug 13, 2026)
+
+**What's New**
+
+- `QuantumRagdoll` unity component now accepts a PhysicsMaterial to be assigned to all limb colliders
+
+**Bug Fixes**
+
+- Fixed: Assertion errors in Debug when adding/removing components in a project that has more than 255 components defined
+- Fixed: An issue with Physics Joints that could cause clients to desync when the solver Warm Start was enabled
+
+### Build 2175 (Aug 12, 2026)
+
+**Bug Fixes**
+
+- Fixed: An issue with snapshot view interpolation mode that caused out of bounds tick requests to warp instead of being clamped
+- Fixed: An issue that caused keeping the snapshot recording enabled for destroyed entities that flagged for `ManualDisposal`
+
+### Build 2171 (Aug 06, 2026)
+
+**Bug Fixes**
+
+- Fixed: Regression (introduced on build 2148) that would cause `KeyNotFoundException` on builds when subscribing event listeners
+
+### Build 2167 (Aug 05, 2026)
+
+**What's New**
+
+- New settings for the Quantum Ragdoll component that allow to setup the chest and hips sizes and offsets
+
+**Bug Fixes**
+
+- Fixed: [CodeGen] only emit namespaces to modules that declare them
+
+### Build 2157 (Aug 04, 2026)
+
+**Bug Fixes**
+
+- Fixed: A regression that made the `sharedResourceManager` on server simulation to be accidentally discarded with rooms
+
+### Build 2148 (Jul 25, 2026)
+
+**Breaking Changes**
+
+- [CodeGen] multiple signals with the same name are now an error
+
+**What's New**
+
+- [CodeGen] `#pragma module <name>`: adding the pragma to a qtn file will emit the output (components, prototypes, events etc.) to a set of module-specific .cs files. This can be used to break apart the "core" module, if it becomes too unwieldy
+- [CodeGen] support for access modifiers for fields and types. Public is still the default
+
+**Changes**
+
+- [CodeGen] code gen output for `FrameEvents`, `FrameSignals` and `Statics` has been changed to make support for `modules` possible
+
+### Build 2142 (Jul 17, 2026)
+
+**Breaking Changes**
+
+- Photon enterprise cloud users require their server to upgrade to Quantum protocol version `3.1.0.0`
+
+**What's New**
+
+- Added a new Quantum callback `CallbackGameResultResponse` to react to completed game result operations
+
 ### Build 2139 (Jul 14, 2026)
 
 **Bug Fixes**

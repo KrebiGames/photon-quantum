@@ -153,42 +153,6 @@ namespace Quantum {
     }
 
     partial struct FrameEvents {
-      
-      static partial void GetParentEventIDCodeGen(int eventID, ref int parentEventID);
-      static partial void GetEventTypeCountCodeGen(ref int eventCount);
-      static partial void GetEventTypeCodeGen(int eventID, ref System.Type result);
-      
-      public static int GetParentEventID(int eventID) {
-        int result = -1;
-        GetParentEventIDCodeGen(eventID, ref result);
-        return result;
-      }
-
-      public static int EVENT_TYPE_COUNT => EventTypeCount; 
-      
-      public static int EventTypeCount {
-        get {
-          int result = -1;
-          GetEventTypeCountCodeGen(ref result);
-          return result;
-        }
-      }
-      
-      public static System.Type GetEventType(int eventID) {
-        System.Type result = null;
-
-        // Special handling with non-code generated events
-        if (eventID == EventGameResult.ID) {
-          return typeof(EventGameResult);
-        }
-
-        GetEventTypeCodeGen(eventID, ref result);
-        if (result == null) {
-          throw new System.ArgumentOutOfRangeException(nameof(eventID));
-        }
-        return result;
-      }
-
       public EventGameResult GameResult(GameResult gameResult) {
         if (_f.IsPredicted) {
           // Synced event only allowed
@@ -203,6 +167,9 @@ namespace Quantum {
         return ev;
       }
     }
+  }
+
+  public static partial class Constants {
   }
 }
 
@@ -454,6 +421,75 @@ namespace Quantum {
 #endregion
 
 
+#region Assets/Photon/Quantum/Simulation/Core/ComponentRegistrations.cs
+
+namespace Quantum {
+  partial class Statics {
+    /// <summary>
+    /// Collects every component type into a <see cref="ComponentRegistry"/>. Code generation adds one field
+    /// initializer per qtn file across partial declarations of this record, each calling a generated static
+    /// method that registers its components on the primary-constructor <c>registry</c>; constructing an instance
+    /// runs them all. Ids are not assigned here — <see cref="ComponentRegistry.Commit"/> derives them from the
+    /// complete set, so initializer order across partial parts does not matter.
+    /// </summary>
+    public partial record ComponentRegistrations(ComponentRegistry registry) {
+      ComponentRegistry registry { get; } = registry;
+
+      // restore object semantics
+      public override int GetHashCode() {
+        // ReSharper disable once BaseObjectGetHashCodeCallInGetHashCode
+        return base.GetHashCode();
+      }
+
+      public virtual bool Equals(ComponentRegistrations other) {
+        return ReferenceEquals(this, other);
+      }
+    }
+  }
+}
+
+
+#endregion
+
+
+#region Assets/Photon/Quantum/Simulation/Core/EventRegistrations.cs
+
+namespace Quantum {
+  partial class Statics {
+    /// <summary>
+    /// Collects every event type into an <see cref="EventRegistry"/>. Code generation adds one field initializer
+    /// per qtn file across partial declarations of this record, each calling a generated static method that
+    /// registers its events on the primary-constructor <c>registry</c>; constructing an instance runs them all.
+    /// Ids are not assigned here — <see cref="EventRegistry.Commit"/> derives them from the complete set.
+    /// </summary>
+    public partial record EventRegistrations(EventRegistry registry) {
+      EventRegistry registry { get; } = registry;
+
+      // built-in events ride the same record as the generated ones
+      internal EventRegistry BuiltInRegistrations = registry.Register<EventGameResult>(EventGameResult.ID);
+      
+      // restore object semantics
+      public override int GetHashCode() {
+        // ReSharper disable once BaseObjectGetHashCodeCallInGetHashCode
+        return base.GetHashCode();
+      }
+
+      public virtual bool Equals(EventRegistrations other) {
+        return ReferenceEquals(this, other);
+      }
+
+      public EventRegistry Commit() {
+        registry.Commit();
+        return registry;
+      }
+    }
+  }
+}
+
+
+#endregion
+
+
 #region Assets/Photon/Quantum/Simulation/Core/Frame.cs
 
 namespace Quantum {
@@ -539,42 +575,6 @@ namespace Quantum {
 
     // player data
     PersistentMap<Int32, RuntimePlayerData> _playerData;
-
-#pragma warning disable CS0618 // Type or member is obsolete
-    ISignalOnPlayerDataSet[] _ISignalOnPlayerDataSet;
-#pragma warning restore CS0618 // Type or member is obsolete
-    ISignalOnPlayerAdded[] _ISignalOnPlayerAdded;
-    ISignalOnPlayerRemoved[] _ISignalOnPlayerRemoved;
-
-    // 2D Physics collision signals
-    ISignalOnCollision2D[] _ISignalOnCollision2DSystems;
-    ISignalOnCollisionEnter2D[] _ISignalOnCollisionEnter2DSystems;
-    ISignalOnCollisionExit2D[] _ISignalOnCollisionExit2DSystems;
-
-    // 2D Physics trigger signals
-    ISignalOnTrigger2D[] _ISignalOnTrigger2DSystems;
-    ISignalOnTriggerEnter2D[] _ISignalOnTriggerEnter2DSystems;
-    ISignalOnTriggerExit2D[] _ISignalOnTriggerExit2DSystems;
-
-    // 3D Physics collision signals
-    ISignalOnCollision3D[] _ISignalOnCollision3DSystems;
-    ISignalOnCollisionEnter3D[] _ISignalOnCollisionEnter3DSystems;
-    ISignalOnCollisionExit3D[] _ISignalOnCollisionExit3DSystems;
-
-    // 3D Physics trigger signals
-    ISignalOnTrigger3D[] _ISignalOnTrigger3DSystems;
-    ISignalOnTriggerEnter3D[] _ISignalOnTriggerEnter3DSystems;
-    ISignalOnTriggerExit3D[] _ISignalOnTriggerExit3DSystems;
-
-    ISignalOnNavMeshWaypointReached[] _ISignalOnNavMeshWaypointReachedSystems;
-    ISignalOnNavMeshSearchFailed[] _ISignalOnNavMeshSearchFailedSystems;
-    ISignalOnNavMeshMoveAgent[] _ISignalOnNavMeshMoveAgentSystems;
-
-    ISignalOnMapChanged[] _ISignalOnMapChangedSystems;
-    ISignalOnEntityPrototypeMaterialized[] _ISignalOnEntityPrototypeMaterializedSystems;
-
-    ISignalOnPlayerConnected[] _ISignalOnPlayerConnectedSystems;
-    ISignalOnPlayerDisconnected[] _ISignalOnPlayerDisconnectedSystems;
 
     /// <summary>
     /// Access the global read and write struct with generated variables by the Quantum DSL compiler.
@@ -785,10 +785,11 @@ namespace Quantum {
       AllocGen();
       InitStatic();
       InitGen();
+      AllocateComponentSignalArrays();
       InitAddons();
 
-      Events = new FrameEvents(this);
       Signals = new FrameSignals(this);
+      Events = new FrameEvents(this);
       Unsafe = new FrameBaseUnsafe(this);
 
       if (context.Physics2D != null) {
@@ -801,48 +802,10 @@ namespace Quantum {
         PhysicsEngineState3D.Allocate(this, 64);
       }
 
-      // player data set signal
-#pragma warning disable CS0618 // Type or member is obsolete
-      _ISignalOnPlayerDataSet = BuildSignalsArray<ISignalOnPlayerDataSet>();
-#pragma warning restore CS0618 // Type or member is obsolete
-      _ISignalOnPlayerAdded = BuildSignalsArray<ISignalOnPlayerAdded>();
-      _ISignalOnPlayerRemoved = BuildSignalsArray<ISignalOnPlayerRemoved>();
-
-      // 2D Physics collision signals
-      _ISignalOnCollision2DSystems = BuildSignalsArray<ISignalOnCollision2D>();
-      _ISignalOnCollisionEnter2DSystems = BuildSignalsArray<ISignalOnCollisionEnter2D>();
-      _ISignalOnCollisionExit2DSystems = BuildSignalsArray<ISignalOnCollisionExit2D>();
-
-      // 2D Physics trigger signals
-      _ISignalOnTrigger2DSystems = BuildSignalsArray<ISignalOnTrigger2D>();
-      _ISignalOnTriggerEnter2DSystems = BuildSignalsArray<ISignalOnTriggerEnter2D>();
-      _ISignalOnTriggerExit2DSystems = BuildSignalsArray<ISignalOnTriggerExit2D>();
-
-      // 3D Physics collision signals
-      _ISignalOnCollision3DSystems = BuildSignalsArray<ISignalOnCollision3D>();
-      _ISignalOnCollisionEnter3DSystems = BuildSignalsArray<ISignalOnCollisionEnter3D>();
-      _ISignalOnCollisionExit3DSystems = BuildSignalsArray<ISignalOnCollisionExit3D>();
-
-      // 3D Physics trigger signals
-      _ISignalOnTrigger3DSystems = BuildSignalsArray<ISignalOnTrigger3D>();
-      _ISignalOnTriggerEnter3DSystems = BuildSignalsArray<ISignalOnTriggerEnter3D>();
-      _ISignalOnTriggerExit3DSystems = BuildSignalsArray<ISignalOnTriggerExit3D>();
-
-      _ISignalOnNavMeshWaypointReachedSystems = BuildSignalsArray<ISignalOnNavMeshWaypointReached>();
-      _ISignalOnNavMeshSearchFailedSystems = BuildSignalsArray<ISignalOnNavMeshSearchFailed>();
-      _ISignalOnNavMeshMoveAgentSystems = BuildSignalsArray<ISignalOnNavMeshMoveAgent>();
-
-      // map changed signal
-      _ISignalOnMapChangedSystems = BuildSignalsArray<ISignalOnMapChanged>();
-
       // prototype materialized signal
-      _ISignalOnEntityPrototypeMaterializedSystems = BuildSignalsArray<ISignalOnEntityPrototypeMaterialized>();
-      if (_ISignalOnEntityPrototypeMaterializedSystems.Length > 0) {
-        base._SignalOnEntityPrototypeMaterialized = (entity, prototype) => Signals.OnEntityPrototypeMaterialized(entity, prototype);
+      if (Signals.Any<ISignalOnEntityPrototypeMaterialized>()) {
+        base._SignalOnEntityPrototypeMaterialized = Signals.OnEntityPrototypeMaterialized;
       }
-
-      _ISignalOnPlayerConnectedSystems = BuildSignalsArray<ISignalOnPlayerConnected>();
-      _ISignalOnPlayerDisconnectedSystems = BuildSignalsArray<ISignalOnPlayerDisconnected>();
 
       // assign map, rng session, etc.
       GlobalsCore->Map = FindAsset<Map>(runtimeConfig.Map.Id);
@@ -1677,83 +1640,7 @@ namespace Quantum {
     #endregion Legacy
 
     #endregion // System API
-
-    T[] BuildSignalsArray<T>() {
-      // Replaced LINQ expression
-      //return _systemsAll.Where(x => x is T).Cast<T>().ToArray();
-      return BuildArrayOfType<T>(_systemsAll);
-
-    }
-
-    static T[] BuildArrayOfType<T>(object[] systems) {
-      //HostProfiler.Start("BuildSignalsArray");
-
-      // Use ArraySegments as an alternative to iterating twice, but the measured improvements were minor.
-      var count = 0;
-      for (var i = 0; i < systems.Length; i++) {
-        if (systems[i] is T) {
-          count++;
-        }
-      }
-
-      var result = new T[count];
-      var resultIndex = 0;
-
-      for (var i = 0; i < systems.Length; i++) {
-        if (systems[i] is T system) {
-          result[resultIndex++] = system;
-        }
-      }
-
-      //HostProfiler.End();
-
-      return result;
-    }
-
-    void BuildSignalsArrayOnComponentAdded<T>() where T : unmanaged, IComponent {
-      Assert.Check(ComponentTypeId<T>.Id > 0);
-
-      // Replaced LINQ expression
-      // var array = _systemsAll.Where(x => x is ISignalOnComponentAdded<T>).Cast<ISignalOnComponentAdded<T>>().ToArray();
-      var array = BuildArrayOfType<ISignalOnComponentAdded<T>>(_systemsAll);
-
-      if (array.Length > 0) {
-        _ComponentSignalsOnAdded[ComponentTypeId<T>.Id] = (entity, componentData) => {
-          var component = (T*)componentData;
-          var systems = &(GlobalsCore->Systems);
-          for (Int32 i = 0; i < array.Length; ++i) {
-            if (SystemIsEnabledInHierarchy((SystemBase)array[i])) {
-              array[i].OnAdded(this, entity, component);
-            }
-          }
-        };
-      } else {
-        _ComponentSignalsOnAdded[ComponentTypeId<T>.Id] = null;
-      }
-    }
-
-    void BuildSignalsArrayOnComponentRemoved<T>() where T : unmanaged, IComponent {
-      Assert.Check(ComponentTypeId<T>.Id > 0);
-
-      // Replaced LINQ expression
-      //var array = _systemsAll.Where(x => x is ISignalOnComponentRemoved<T>).Cast<ISignalOnComponentRemoved<T>>().ToArray();
-      var array = BuildArrayOfType<ISignalOnComponentRemoved<T>>(_systemsAll);
-      
-      if (array.Length> 0) {
-        _ComponentSignalsOnRemoved[ComponentTypeId<T>.Id] = (entity, componentData) => {
-          var component = (T*)componentData;
-          var systems = &(GlobalsCore->Systems);
-          for (Int32 i = 0; i < array.Length; ++i) {
-            if (SystemIsEnabledInHierarchy((SystemBase)array[i])) {
-              array[i].OnRemoved(this, entity, component);
-            }
-          }
-        };
-      } else {
-        _ComponentSignalsOnRemoved[ComponentTypeId<T>.Id] = null;
-      }
-    }
-
+    
     void AddEvent(EventBase evnt) {
       // set evnt.Tick
       evnt.Tick = Number;
@@ -1990,12 +1877,30 @@ namespace Quantum {
 #region Assets/Photon/Quantum/Simulation/Core/FrameEvents.cs
 
 namespace Quantum {
+  using System;
+  
   partial class Frame {
     public partial struct FrameEvents {
       Frame _f;
 
       public FrameEvents(Frame f) {
         _f = f;
+      }
+      
+      public static int GetParentEventID(int eventID) {
+        return Statics.EventRegistry.GetParentEventId(eventID);
+      }
+      
+      public static int EVENT_TYPE_COUNT {
+        get {
+          return Statics.EventRegistry.EventTypeCount;
+        }
+      }
+      
+      public static int EventTypeCount => EVENT_TYPE_COUNT;
+      
+      public static System.Type GetEventType(int eventID) {
+        return Statics.EventRegistry.GetEventType(eventID);
       }
     }
   }
@@ -2086,36 +1991,130 @@ namespace Quantum {
     /// <summary>
     /// The Quantum signal API consist of core and user-defined code-generated signals.
     /// </summary>
-    public unsafe partial struct FrameSignals {
-      Frame _f;
+    public unsafe partial record FrameSignals(Frame frame) {
+      Frame frame { get; } = frame;
 
-      /// <summary>
-      /// Constructor. Only used internally.
-      /// </summary>
-      /// <param name="f">The frame reference.</param>
-      public FrameSignals(Frame f) {
-        _f = f;
+      internal bool Any<T>() where T : ISignal {
+        var systems = frame._systemsAll;
+        
+        for (var i = 0; i < systems.Length; i++) {
+          if (systems[i] is T) {
+            return true;
+          }
+        }
+
+        return false;
       }
+      
+      static T[] CreateSignalArray<T>(Frame frame) {
+        var systems = frame._systemsAll;
+        
+        var count = 0;
+        for (var i = 0; i < systems.Length; i++) {
+          if (systems[i] is T) {
+            count++;
+          }
+        }
+
+        var result = new T[count];
+        var resultIndex = 0;
+
+        for (var i = 0; i < systems.Length; i++) {
+          if (systems[i] is T system) {
+            result[resultIndex++] = system;
+          }
+        }
+        
+        return result;
+      }
+
+      public readonly struct ComponentSignals {
+        public readonly ISignal[] OnAdded;
+        public readonly ISignal[] OnRemoved;
+        public ComponentSignals(ISignal[] onAdded, ISignal[] onRemoved) {
+          OnAdded = onAdded;
+          OnRemoved = onRemoved;
+        }
+      }
+
+      static ComponentSignals CreateComponentSignals<T>(Frame frame) where T : unmanaged, IComponent {
+        var added = CreateSignalArray<ISignalOnComponentAdded<T>>(frame);
+        if (added.Length > 0) {
+          frame.SetOnComponentAddedCallback<T>((entity, componentData) => {
+            var component = (T*)componentData;
+            for (Int32 i = 0; i < added.Length; ++i) {
+              if (frame.SystemIsEnabledInHierarchy((SystemBase)added[i])) {
+                added[i].OnAdded(frame, entity, component);
+              }
+            }
+          });
+        }
+        var removed = CreateSignalArray<ISignalOnComponentRemoved<T>>(frame);
+        if (removed.Length > 0) {
+          frame.SetOnComponentRemovedCallback<T>((entity, componentData) => {
+            var component = (T*)componentData;
+            for (Int32 i = 0; i < removed.Length; ++i) {
+              if (frame.SystemIsEnabledInHierarchy((SystemBase)removed[i])) {
+                removed[i].OnRemoved(frame, entity, component);
+              }
+            }
+          });
+        }
+        
+        return new ComponentSignals(added, removed);
+      }
+
+#pragma warning disable CS0618 // Type or member is obsolete
+      readonly ISignalOnPlayerDataSet[] _ISignalOnPlayerDataSet = CreateSignalArray<ISignalOnPlayerDataSet>(frame);
+#pragma warning restore CS0618 // Type or member is obsolete
+      readonly ISignalOnPlayerAdded[] _ISignalOnPlayerAdded = CreateSignalArray<ISignalOnPlayerAdded>(frame);
+      readonly ISignalOnPlayerRemoved[] _ISignalOnPlayerRemoved = CreateSignalArray<ISignalOnPlayerRemoved>(frame);
+
+      readonly ISignalOnCollision2D[] _ISignalOnCollision2DSystems = CreateSignalArray<ISignalOnCollision2D>(frame);
+      readonly ISignalOnCollisionEnter2D[] _ISignalOnCollisionEnter2DSystems = CreateSignalArray<ISignalOnCollisionEnter2D>(frame);
+      readonly ISignalOnCollisionExit2D[] _ISignalOnCollisionExit2DSystems = CreateSignalArray<ISignalOnCollisionExit2D>(frame);
+
+      readonly ISignalOnTrigger2D[] _ISignalOnTrigger2DSystems = CreateSignalArray<ISignalOnTrigger2D>(frame);
+      readonly ISignalOnTriggerEnter2D[] _ISignalOnTriggerEnter2DSystems = CreateSignalArray<ISignalOnTriggerEnter2D>(frame);
+      readonly ISignalOnTriggerExit2D[] _ISignalOnTriggerExit2DSystems = CreateSignalArray<ISignalOnTriggerExit2D>(frame);
+
+      readonly ISignalOnCollision3D[] _ISignalOnCollision3DSystems = CreateSignalArray<ISignalOnCollision3D>(frame);
+      readonly ISignalOnCollisionEnter3D[] _ISignalOnCollisionEnter3DSystems = CreateSignalArray<ISignalOnCollisionEnter3D>(frame);
+      readonly ISignalOnCollisionExit3D[] _ISignalOnCollisionExit3DSystems = CreateSignalArray<ISignalOnCollisionExit3D>(frame);
+
+      readonly ISignalOnTrigger3D[] _ISignalOnTrigger3DSystems = CreateSignalArray<ISignalOnTrigger3D>(frame);
+      readonly ISignalOnTriggerEnter3D[] _ISignalOnTriggerEnter3DSystems = CreateSignalArray<ISignalOnTriggerEnter3D>(frame);
+      readonly ISignalOnTriggerExit3D[] _ISignalOnTriggerExit3DSystems = CreateSignalArray<ISignalOnTriggerExit3D>(frame);
+
+      readonly ISignalOnNavMeshWaypointReached[] _ISignalOnNavMeshWaypointReachedSystems = CreateSignalArray<ISignalOnNavMeshWaypointReached>(frame);
+      readonly ISignalOnNavMeshSearchFailed[] _ISignalOnNavMeshSearchFailedSystems = CreateSignalArray<ISignalOnNavMeshSearchFailed>(frame);
+      readonly ISignalOnNavMeshMoveAgent[] _ISignalOnNavMeshMoveAgentSystems = CreateSignalArray<ISignalOnNavMeshMoveAgent>(frame);
+
+      readonly ISignalOnMapChanged[] _ISignalOnMapChangedSystems = CreateSignalArray<ISignalOnMapChanged>(frame);
+      readonly ISignalOnEntityPrototypeMaterialized[] _ISignalOnEntityPrototypeMaterializedSystems = CreateSignalArray<ISignalOnEntityPrototypeMaterialized>(frame);
+
+      readonly ISignalOnPlayerConnected[] _ISignalOnPlayerConnectedSystems = CreateSignalArray<ISignalOnPlayerConnected>(frame);
+      readonly ISignalOnPlayerDisconnected[] _ISignalOnPlayerDisconnectedSystems = CreateSignalArray<ISignalOnPlayerDisconnected>(frame);
 
       /// <inheritdoc cref="ISignalOnPlayerAdded.OnPlayerAdded(Frame, PlayerRef, bool)"/>
       public void OnPlayerAdded(PlayerRef player, bool firstTime) {
         {
-          var array = _f._ISignalOnPlayerAdded;
+          var array = _ISignalOnPlayerAdded;
           for (Int32 i = 0; i < array.Length; ++i) {
             var s = array[i];
-            if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-              s.OnPlayerAdded(_f, player, firstTime);
+            if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+              s.OnPlayerAdded(frame, player, firstTime);
             }
           }
         }
 
         // Call deprecated signals
         {
-          var array = _f._ISignalOnPlayerDataSet;
+          var array = _ISignalOnPlayerDataSet;
           for (Int32 i = 0; i < array.Length; ++i) {
             var s = array[i];
-            if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-              s.OnPlayerDataSet(_f, player);
+            if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+              s.OnPlayerDataSet(frame, player);
             }
           }
         }
@@ -2124,11 +2123,11 @@ namespace Quantum {
       /// <inheritdoc cref="ISignalOnPlayerRemoved.OnPlayerRemoved(Frame, PlayerRef)"/>
       public void OnPlayerRemoved(PlayerRef player) {
         {
-          var array = _f._ISignalOnPlayerRemoved;
+          var array = _ISignalOnPlayerRemoved;
           for (Int32 i = 0; i < array.Length; ++i) {
             var s = array[i];
-            if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-              s.OnPlayerRemoved(_f, player);
+            if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+              s.OnPlayerRemoved(frame, player);
             }
           }
         }
@@ -2136,211 +2135,221 @@ namespace Quantum {
 
       /// <inheritdoc cref="ISignalOnMapChanged.OnMapChanged(Frame, AssetRef{Map})"/>
       public void OnMapChanged(AssetRef<Map> previousMap) {
-        var array = _f._ISignalOnMapChangedSystems;
+        var array = _ISignalOnMapChangedSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnMapChanged(_f, previousMap);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnMapChanged(frame, previousMap);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnEntityPrototypeMaterialized.OnEntityPrototypeMaterialized(Frame, EntityRef, EntityPrototypeRef)"/>
       public void OnEntityPrototypeMaterialized(EntityRef entity, EntityPrototypeRef prototypeRef) {
-        var array = _f._ISignalOnEntityPrototypeMaterializedSystems;
+        var array = _ISignalOnEntityPrototypeMaterializedSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnEntityPrototypeMaterialized(_f, entity, prototypeRef);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnEntityPrototypeMaterialized(frame, entity, prototypeRef);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnPlayerConnected.OnPlayerConnected(Frame, PlayerRef)"/>
       public void OnPlayerConnected(PlayerRef player) {
-        var array = _f._ISignalOnPlayerConnectedSystems;
+        var array = _ISignalOnPlayerConnectedSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnPlayerConnected(_f, player);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnPlayerConnected(frame, player);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnPlayerDisconnected.OnPlayerDisconnected(Frame, PlayerRef)"/>
       public void OnPlayerDisconnected(PlayerRef player) {
-        var array = _f._ISignalOnPlayerDisconnectedSystems;
+        var array = _ISignalOnPlayerDisconnectedSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnPlayerDisconnected(_f, player);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnPlayerDisconnected(frame, player);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnNavMeshWaypointReached.OnNavMeshWaypointReached(Frame, EntityRef, FPVector3, Navigation.WaypointFlag, ref bool)"/>
       public void OnNavMeshWaypointReached(EntityRef entity, FPVector3 waypoint, Navigation.WaypointFlag waypointFlags, ref bool resetAgent) {
-        var array   = _f._ISignalOnNavMeshWaypointReachedSystems;
+        var array   = _ISignalOnNavMeshWaypointReachedSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnNavMeshWaypointReached(_f, entity, waypoint, waypointFlags, ref resetAgent);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnNavMeshWaypointReached(frame, entity, waypoint, waypointFlags, ref resetAgent);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnNavMeshSearchFailed.OnNavMeshSearchFailed(Frame, EntityRef, ref bool)"/>
       public void OnNavMeshSearchFailed(EntityRef entity, ref bool resetAgent) {
-        var array   = _f._ISignalOnNavMeshSearchFailedSystems;
+        var array   = _ISignalOnNavMeshSearchFailedSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnNavMeshSearchFailed(_f, entity, ref resetAgent);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnNavMeshSearchFailed(frame, entity, ref resetAgent);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnNavMeshMoveAgent.OnNavMeshMoveAgent(Frame, EntityRef, FPVector2)"/>
       public void OnNavMeshMoveAgent(EntityRef entity, FPVector2 desiredDirection) {
-        var array = _f._ISignalOnNavMeshMoveAgentSystems;
+        var array = _ISignalOnNavMeshMoveAgentSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnNavMeshMoveAgent(_f, entity, desiredDirection);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnNavMeshMoveAgent(frame, entity, desiredDirection);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnCollision2D.OnCollision2D(Frame, CollisionInfo2D)"/>
       public void OnCollision2D(CollisionInfo2D info) {
-        var array   = _f._ISignalOnCollision2DSystems;
+        var array   = _ISignalOnCollision2DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnCollision2D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnCollision2D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnCollisionEnter2D.OnCollisionEnter2D(Frame, CollisionInfo2D)"/>
       public void OnCollisionEnter2D(CollisionInfo2D info) {
-        var array   = _f._ISignalOnCollisionEnter2DSystems;
+        var array   = _ISignalOnCollisionEnter2DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnCollisionEnter2D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnCollisionEnter2D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnCollisionExit2D.OnCollisionExit2D(Frame, ExitInfo2D)"/>
       public void OnCollisionExit2D(ExitInfo2D info) {
-        var array   = _f._ISignalOnCollisionExit2DSystems;
+        var array   = _ISignalOnCollisionExit2DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnCollisionExit2D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnCollisionExit2D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnTrigger2D.OnTrigger2D(Frame, TriggerInfo2D)"/>
       public void OnTrigger2D(TriggerInfo2D info) {
-        var array   = _f._ISignalOnTrigger2DSystems;
+        var array   = _ISignalOnTrigger2DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnTrigger2D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnTrigger2D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnTriggerEnter2D.OnTriggerEnter2D(Frame, TriggerInfo2D)"/>
       public void OnTriggerEnter2D(TriggerInfo2D info) {
-        var array   = _f._ISignalOnTriggerEnter2DSystems;
+        var array   = _ISignalOnTriggerEnter2DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnTriggerEnter2D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnTriggerEnter2D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnTriggerExit2D.OnTriggerExit2D(Frame, ExitInfo2D)"/>
       public void OnTriggerExit2D(ExitInfo2D info) {
-        var array   = _f._ISignalOnTriggerExit2DSystems;
+        var array   = _ISignalOnTriggerExit2DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnTriggerExit2D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnTriggerExit2D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnCollision3D.OnCollision3D(Frame, CollisionInfo3D)"/>
       public void OnCollision3D(CollisionInfo3D info) {
-        var array   = _f._ISignalOnCollision3DSystems;
+        var array   = _ISignalOnCollision3DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnCollision3D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnCollision3D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnCollisionEnter3D.OnCollisionEnter3D(Frame, CollisionInfo3D)"/>
       public void OnCollisionEnter3D(CollisionInfo3D info) {
-        var array   = _f._ISignalOnCollisionEnter3DSystems;
+        var array   = _ISignalOnCollisionEnter3DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnCollisionEnter3D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnCollisionEnter3D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnCollisionExit3D.OnCollisionExit3D(Frame, ExitInfo3D)"/>
       public void OnCollisionExit3D(ExitInfo3D info) {
-        var array   = _f._ISignalOnCollisionExit3DSystems;
+        var array   = _ISignalOnCollisionExit3DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnCollisionExit3D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnCollisionExit3D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnTrigger3D.OnTrigger3D(Frame, TriggerInfo3D)"/>
       public void OnTrigger3D(TriggerInfo3D info) {
-        var array   = _f._ISignalOnTrigger3DSystems;
+        var array   = _ISignalOnTrigger3DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnTrigger3D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnTrigger3D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnTriggerEnter3D.OnTriggerEnter3D(Frame, TriggerInfo3D)"/>
       public void OnTriggerEnter3D(TriggerInfo3D info) {
-        var array   = _f._ISignalOnTriggerEnter3DSystems;
+        var array   = _ISignalOnTriggerEnter3DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnTriggerEnter3D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnTriggerEnter3D(frame, info);
           }
         }
       }
 
       /// <inheritdoc cref="ISignalOnTriggerExit3D.OnTriggerExit3D(Frame, ExitInfo3D)"/>
       public void OnTriggerExit3D(ExitInfo3D info) {
-        var array   = _f._ISignalOnTriggerExit3DSystems;
+        var array   = _ISignalOnTriggerExit3DSystems;
         for (Int32 i = 0; i < array.Length; ++i) {
           var s = array[i];
-          if (_f.SystemIsEnabledInHierarchy((SystemBase)s)) {
-            s.OnTriggerExit3D(_f, info);
+          if (frame.SystemIsEnabledInHierarchy((SystemBase)s)) {
+            s.OnTriggerExit3D(frame, info);
           }
         }
+      }
+
+      // restore object semantics
+      public override int GetHashCode() {
+        // ReSharper disable once BaseObjectGetHashCodeCallInGetHashCode
+        return base.GetHashCode();
+      }
+
+      public virtual bool Equals(FrameSignals other) {
+        return ReferenceEquals(this, other);
       }
     }
   }
@@ -2792,19 +2801,22 @@ namespace Quantum {
 #region Assets/Photon/Quantum/Simulation/Core/Statics.cs
 
 namespace Quantum {
+  using Unity.IL2CPP.CompilerServices;
   using UnityEngine;
   using UnityEngine.Scripting;
 
   /// <summary>
   /// Static type registry is completed by code generation.
   /// </summary>
-  partial class Statics {
+  [Il2CppEagerStaticClassConstruction]
+  public partial class Statics {
     static Statics() {
-      InitComponentTypeIdGen();
-      InitStaticDelegatesGen();
+      InitComponentTypeId();
       InitStaticDelegatesAddons();
       InitStaticDelegatesUser();
     }
+
+    internal static readonly EventRegistry EventRegistry = new EventRegistrations(new EventRegistry()).Commit();
 
 #if QUANTUM_UNITY
     [RuntimeInitializeOnLoadMethod]
@@ -2814,15 +2826,17 @@ namespace Quantum {
       // this will invoke the static constructor
     }
 
-    public static void InitComponentTypeId(int extraComponentCount) {
-      InitComponentTypeIdGen(extraComponentCount);
+    public static void InitComponentTypeId() {
+      var registry = new ComponentRegistry();
+      _ = new ComponentRegistrations(registry);
+      registry.Commit();
     }
 
 #if QUANTUM_UNITY
     [UnityEngine.Scripting.Preserve]
 #endif
     static void EnsureNotStripped() {
-      EnsureNotStrippedGen();
+      FramePrinter.EnsureNotStripped();
       EnsureNotStrippedAddons();
     }
     
@@ -2831,21 +2845,16 @@ namespace Quantum {
     /// </summary>
     /// <param name="typeRegistry">Type registry.</param>
     public static void RegisterSimulationTypes(TypeRegistry typeRegistry) {
-      RegisterSimulationTypesGen(typeRegistry);
+      _ = new TypeRegistrations(typeRegistry);
       RegisterLegacySimulationTypesGen(typeRegistry);
       RegisterSimulationTypesAddons(typeRegistry);
       RegisterSimulationTypesUser(typeRegistry);
     }
     
-    static partial void InitComponentTypeIdGen(int extraComponentCount = 0);
-    static partial void InitStaticDelegatesGen();
     static partial void InitStaticDelegatesUser();
-    
-    static partial void RegisterSimulationTypesGen(TypeRegistry typeRegistry);
+
     static partial void RegisterLegacySimulationTypesGen(TypeRegistry typeRegistry);
     static partial void RegisterSimulationTypesUser(TypeRegistry typeRegistry);
-    
-    static partial void EnsureNotStrippedGen();
   }
 }
 
@@ -2974,6 +2983,37 @@ namespace Quantum {
 #endregion
 
 
+#region Assets/Photon/Quantum/Simulation/Core/TypeRegistrations.cs
+
+namespace Quantum {
+  partial class Statics {
+    /// <summary>
+    /// Registers every simulation type's size into a <see cref="TypeRegistry"/>. Code generation adds one field
+    /// initializer per qtn file across partial declarations of this record, each calling a generated static
+    /// method that registers its types on the primary-constructor <c>registry</c>; constructing an instance runs
+    /// them all. IL2CPP printer instantiations are anchored separately by the generated per-file
+    /// <c>[Preserve]</c> members, not here.
+    /// </summary>
+    public partial record TypeRegistrations(TypeRegistry registry) {
+      TypeRegistry registry { get; } = registry;
+      
+      // restore object semantics
+      public override int GetHashCode() {
+        // ReSharper disable once BaseObjectGetHashCodeCallInGetHashCode
+        return base.GetHashCode();
+      }
+
+      public virtual bool Equals(TypeRegistrations other) {
+        return ReferenceEquals(this, other);
+      }
+    }
+  }
+}
+
+
+#endregion
+
+
 #region Assets/Photon/Quantum/Simulation/Events/EventGameResult.cs
 
 namespace Quantum {
@@ -3051,6 +3091,7 @@ namespace Quantum {
         { typeof(CallbackLocalPlayerAddFailed), CallbackLocalPlayerAddFailed.ID },
         { typeof(CallbackLocalPlayerRemoveFailed), CallbackLocalPlayerRemoveFailed.ID },
         { typeof(CallbackTaskProfilerReportGenerated), CallbackTaskProfilerReportGenerated.ID },
+        { typeof(CallbackGameResultResponse), CallbackGameResultResponse.ID },
       };
     }
 
@@ -3238,7 +3279,7 @@ namespace Quantum {
         { typeof(EventBase), 0 }
       };
 
-      for (int eventID = 0; eventID < Frame.FrameEvents.EVENT_TYPE_COUNT; ++eventID) {
+      for (int eventID = 0; eventID < Frame.FrameEvents.EventTypeCount; ++eventID) {
         result.Add(Frame.FrameEvents.GetEventType(eventID), eventID + 1);
       }
 
@@ -4198,6 +4239,10 @@ namespace Quantum {
       }
     }
 
+    public void OnGameResultResponse(bool success, GameResultResponseCode code) {
+      InvokeOnGameResultResponse(success, code);
+    }
+
     /// <summary>
     /// Return the in memory input size.
     /// </summary>
@@ -4985,6 +5030,10 @@ namespace Quantum {
     /// </summary>
     SimulationStageFinished,
     /// <summary>
+    /// Callback send after game result has been received.
+    /// </summary>
+    GameResultResponse,
+    /// <summary>
     /// A tag where user callbacks can start.
     /// </summary>
     UserCallbackIdStart,
@@ -5653,7 +5702,33 @@ namespace Quantum {
     /// </summary>
     public ProfilerContextData Report;
   }
-  
+
+  /// <summary>
+  /// Callback when <see cref="GameResult"/> was recieved by the server.
+  /// </summary>
+  public sealed class CallbackGameResultResponse : QuantumGame.CallbackBase {
+    /// <summary>
+    /// The const CallbackProfilerReportGenerated callback id.
+    /// </summary>
+    public new const Int32 ID = (int)CallbackId.GameResultResponse;
+
+    internal CallbackGameResultResponse(QuantumGame game) : base(ID, game) { }
+
+    /// <summary>
+    /// Has the request been successful.
+    /// </summary>
+    public bool Success;
+    /// <summary>
+    /// Debug response code.
+    /// </summary>
+    public GameResultResponseCode Code;
+
+    /// <summary>
+    /// The profiler report.
+    /// </summary>
+    public ProfilerContextData Report;
+  }
+
   partial class QuantumGame {
     /// <summary>
     /// The base class of Quantum callbacks.
@@ -5701,6 +5776,7 @@ namespace Quantum {
           case CallbackId.PlayerRemoveFailed: return typeof(CallbackLocalPlayerRemoveFailed);
           case CallbackId.BeforeSimulationStage: return typeof(CallbackBeforeSimulationStage);
           case CallbackId.SimulationStageFinished: return typeof(CallbackSimulationStageFinished);
+          case CallbackId.GameResultResponse: return typeof(CallbackGameResultResponse);
           default: throw new ArgumentOutOfRangeException(nameof(id));
         }
       }
@@ -5728,6 +5804,7 @@ namespace Quantum {
     private CallbackLocalPlayerAddFailed _callbackLocalPlayerAddFailed;
     private CallbackLocalPlayerRemoveFailed _callbackLocalPlayerRemoveFailed;
     private CallbackTaskProfilerReportGenerated _callbackTaskProfilerReportGenerated;
+    private CallbackGameResultResponse _callbackGameResultResponse;
 
     /// <summary>
     /// Initializes all callbacks.
@@ -5754,6 +5831,7 @@ namespace Quantum {
       _callbackLocalPlayerAddFailed = new CallbackLocalPlayerAddFailed(this);
       _callbackLocalPlayerRemoveFailed = new CallbackLocalPlayerRemoveFailed(this);
       _callbackTaskProfilerReportGenerated = new CallbackTaskProfilerReportGenerated(this);
+      _callbackGameResultResponse = new CallbackGameResultResponse(this);
     }
 
 
@@ -6008,6 +6086,21 @@ namespace Quantum {
         _callbackLocalPlayerRemoveFailed.Message = message;
         if (_callbackDispatcher != null) {
           result = _callbackDispatcher.Publish(_callbackLocalPlayerRemoveFailed);
+        }
+      } catch (Exception ex) {
+        Log.Exception(ex);
+      }
+
+      return result;
+    }
+
+    bool InvokeOnGameResultResponse(bool success, GameResultResponseCode code) {
+      var result = false;
+      try {
+        _callbackGameResultResponse.Success = success;
+        _callbackGameResultResponse.Code = code;
+        if (_callbackDispatcher != null) {
+          result = _callbackDispatcher.Publish(_callbackGameResultResponse);
         }
       } catch (Exception ex) {
         Log.Exception(ex);
@@ -7660,7 +7753,6 @@ namespace Quantum {
           FPLut.Init(args.LutPath);
         }
 
-        // TODO: If resource manager changes during runtime there should be an option to pass an instance here or to to create individual managers for each simulation and make it accessible.
         if (_sharedResourceManager == null) {
           byte[] assetDBData = null;
 
@@ -7700,7 +7792,6 @@ namespace Quantum {
     /// </summary>
     public void Shutdown() {
       _commandSerializer = null;
-      _sharedResourceManager = null;
     }
 
     /// <summary>

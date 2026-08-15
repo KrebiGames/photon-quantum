@@ -685,17 +685,24 @@ namespace Quantum {
         return;
       }
 
-      view.OnEntityDestroyed.Invoke(game);
+      try {
+        view.OnEntityDestroyed.Invoke(game);
+      } catch (Exception ex) {
+        Log.Error($"Exception in OnEntityDestroyed callback for entity view '{view.name}': {ex}");
+      }
 
-      if (view.ManualDisposal == false) {
-        if (view == null) {
-          EntityRef entityRef = EntityRef.None;
-          try {
-            // Unity object could still be readable (although null).
-            entityRef = view.EntityRef;
-          } catch { }
-          Log.Warn($"Quantum Entity View '{entityRef}' was already destroyed");
-        } else {
+      if (view == null) {
+        EntityRef entityRef = EntityRef.None;
+        try {
+          // Unity object could still be readable (although null).
+          entityRef = view.EntityRef;
+        } catch { }
+        Log.Warn($"Quantum Entity View '{entityRef}' was already destroyed");
+      } else {
+        if (view.ManualDisposal) {
+          view.DeactivateForManualDisposal();
+        }
+        else { 
           view.Deactivate();
           if (view.AssetGuid.IsValid) {
             DestroyEntityViewInstance(view);

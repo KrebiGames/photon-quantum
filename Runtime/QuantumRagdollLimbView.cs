@@ -14,10 +14,15 @@ using UnityEngine;
     public int _depth;
 
     /// <summary>
-    /// A reference to the Unity's ragdoll editor. It will update 
+    /// A reference to the Unity's ragdoll editor. It will update
     /// </summary>
     [SerializeField] QuantumRagdoll _ragdollView;
-    
+
+    /// <summary>
+    /// The <see cref="QuantumRagdoll"/> that baked this limb. Used to track the ownership of the baked components.
+    /// </summary>
+    public QuantumRagdoll Ragdoll => _ragdollView;
+
     /// <summary>
     /// Setup the root of the ragdoll system as a <see cref="QuantumRagdoll"/> and set the level of depth of this limb.
     /// </summary>

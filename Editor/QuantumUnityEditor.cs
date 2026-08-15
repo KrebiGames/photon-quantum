@@ -24152,6 +24152,11 @@ namespace Quantum.Editor {
       QuantumRagdoll.RagdollParameters ragdollParameters = new QuantumRagdoll.RagdollParameters() {
         _limbUpDirection = QuantumRagdoll.BoneDirection.NegativeY,
         _limbThickness = 0.18f,
+        _chestForwardOffset = 0f,
+        _chestThickness = 0,
+        _bellyThickness = 0f,
+        _bellyForwardOffset = 0f,
+        _generalDrag = 1f,
         _jointDistance = 0.05f,
         _headSize = 0.4f,
         _headDistance = 0.0f,
@@ -25268,14 +25273,18 @@ namespace Quantum.Editor {
           continue;
         }
         
+        var references = mapData.SceneObjectReferences;
         var metadata = QuantumMapBakeMetadata.TryGet(map);
+        
         if (!metadata) {
-          QuantumEditorLog.Error($"Map '{map.name}' (scene: '{scene.path}') does not contain required metadata, needs to be rebaked");
+          if (AssetDatabase.IsNativeAsset(map)) {
+            QuantumEditorLog.WarnImport($"Map '{map.name}' (scene: '{scene.path}') has no bake metadata, falling back to references serialized in the scene by a pre-clean-scene-bake version.");
+          } else {
+            QuantumEditorLog.Error($"Map '{map.name}' (scene: '{scene.path}') does not contain required metadata, needs to be rebaked");
+          }
           continue;
         }
-
-        var references = mapData.SceneObjectReferences;
-
+        
         using (s_resolveColliders2D.Auto()) {
           references.StaticCollider2DReferences = Resolve<QuantumStaticCollider2DSource>(scene, metadata.StaticColliders2DIds);
         }

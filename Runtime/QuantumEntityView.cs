@@ -656,6 +656,13 @@ namespace Quantum {
       OnDeactivate();
     }
 
+    /// <summary>
+    /// Minimum version of disposal that is removing snapshot subscriptions.
+    /// </summary>
+    internal void DeactivateForManualDisposal() {
+      QuantumCallback.Unsubscribe(_snapshotSubscription);
+    }
+
     internal void UpdateView(ref UpdateViewParameter updateViewParameter) {
       if ((ViewFlags & QuantumEntityViewFlags.DisableUpdatePosition) == 0) {
         if (Game.Frames.Predicted.Has<Transform2D>(EntityRef)) {

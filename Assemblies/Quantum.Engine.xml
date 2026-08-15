@@ -9292,6 +9292,31 @@
             <param name="type">The <see cref="T:System.Type"/> of the component.</param>
             <returns>A new <see cref="T:Quantum.ComponentPrototypeRef"/> instance.</returns>
         </member>
+        <member name="T:Quantum.ComponentRegistry">
+            <summary>
+            Collects component registrations before ids exist, then <see cref="M:Quantum.ComponentRegistry.Commit"/> assigns dense ids deterministically:
+            explicit ids claim their slots, the rest fill the remaining slots sorted by type name. Ids depend only on the
+            set of collected components, never on the order they were added in, so registrations may be spread across
+            partial declarations whose initializer order is unspecified.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentRegistry.Register``1(Quantum.ComponentSerializeDelegate,Quantum.ComponentChangedDelegate,Quantum.ComponentChangedDelegate,Quantum.ComponentFlags)">
+            <summary>
+            Collect a component; its id gets assigned in <see cref="M:Quantum.ComponentRegistry.Commit"/>. Returns the registry so
+            registrations can be chained.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentRegistry.Register``1(System.Int32,Quantum.ComponentSerializeDelegate,Quantum.ComponentChangedDelegate,Quantum.ComponentChangedDelegate,Quantum.ComponentFlags)">
+            <summary>
+            Collect a component pinned to an explicit id.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentRegistry.Commit">
+            <summary>
+            Resets <see cref="T:Quantum.ComponentTypeId"/> to fit all collected components, registers the built-in components
+            and then assigns ids and registers the collected ones.
+            </summary>
+        </member>
         <member name="T:Quantum.ComponentSet">
             <summary>
             A bitset representing a set of components. The set can contain up to 512 components.
@@ -10418,6 +10443,30 @@
         <member name="T:Quantum.EventList">
             <summary>
             Internally used class.
+            </summary>
+        </member>
+        <member name="T:Quantum.EventRegistry">
+            <summary>
+            Collects event registrations and produces the id lookup tables. Ids are baked constants (see the generated
+            <c>EventX.ID</c>); the registry only records the type and parent per id so the tables can be built without
+            generated switch methods. Registration order does not matter — entries are placed by their id.
+            </summary>
+        </member>
+        <member name="M:Quantum.EventRegistry.Register``1(System.Int32)">
+            <summary>
+            Collect an event type. The parent is its base type, so events derived from another event chain
+            automatically. Returns the registry so registrations can be chained.
+            </summary>
+        </member>
+        <member name="M:Quantum.EventRegistry.Register(System.Int32,System.Type)">
+            <summary>
+            Collect an event type. Returns the registry so registrations can be chained.
+            </summary>
+        </member>
+        <member name="M:Quantum.EventRegistry.Commit">
+            <summary>
+            Validates that the collected ids form a dense [0, count) range and resolves parent ids from base types.
+            Afterwards the registry serves as the id lookup and accepts no further registrations.
             </summary>
         </member>
         <member name="T:Quantum.DatabaseType">
@@ -28726,6 +28775,11 @@
             Creates a new instance of the type registry and adds built-in types.
             </summary>
         </member>
+        <member name="M:Quantum.TypeRegistry.Register``1(System.Int32)">
+            <summary>
+            Registers a type and its size. Returns the registry so registrations can be chained.
+            </summary>
+        </member>
         <member name="M:Quantum.TypeRegistry.Register(System.Type,System.Int32)">
             <summary>
             Registers a type and its size.
@@ -36774,6 +36828,24 @@
             <param name="serializer">Quantum protocol serializer</param>
             <param name="stream">The bitstream to write to or read from</param>
         </member>
+        <member name="T:Photon.Deterministic.Protocol.GameResultResponse">
+            <summary>
+            The server sends this message to a client to confirm that the 
+            <see cref="T:Photon.Deterministic.Protocol.GameResult"/> was received and it can safely terminate the connection.
+            </summary>
+        </member>
+        <member name="F:Photon.Deterministic.Protocol.GameResultResponse.Code">
+            <summary>
+            Response code (unused).
+            </summary>
+        </member>
+        <member name="M:Photon.Deterministic.Protocol.GameResultResponse.Serialize(Photon.Deterministic.Protocol.Serializer,Photon.Deterministic.BitStream)">
+            <summary>
+            The message serialization (writing and reading).
+            </summary>
+            <param name="serializer">Quantum protocol serializer</param>
+            <param name="stream">The bitstream to write to or read from</param>
+        </member>
         <member name="T:Photon.Deterministic.Protocol.Message">
             <summary>
             The base class for Quantum network messages.
@@ -37005,6 +37077,11 @@
             Debug string with message content.
             </summary>
             <returns>Debug string</returns>
+        </member>
+        <member name="T:Photon.Deterministic.GameResultResponseCode">
+            <summary>
+            Success and error codes for game result queries.
+            </summary>
         </member>
         <member name="T:Photon.Deterministic.ChecksumErrorFrameDump">
             <summary>
@@ -37953,6 +38030,11 @@
         <member name="F:Photon.Deterministic.DeterministicProtocolVersions.V3_0_0_0">
             <summary>
             3.0.0
+            </summary>
+        </member>
+        <member name="F:Photon.Deterministic.DeterministicProtocolVersions.V3_1_0_0">
+            <summary>
+            3.1.0, enables games result reponse
             </summary>
         </member>
         <member name="T:Photon.Deterministic.DeterministicProtocolVersionAttribute">
@@ -39522,6 +39604,11 @@
             </summary>
             <param name="playerSlot">The player slot that was tried to remove</param>
             <param name="message">Debug message</param>
+        </member>
+        <member name="M:Photon.Deterministic.IDeterministicGame.OnGameResultResponse(System.Boolean,Photon.Deterministic.GameResultResponseCode)">
+            <summary>
+            Is invoked when the server received the game result.
+            </summary>
         </member>
         <member name="T:Photon.Deterministic.DeterministicInput">
             <summary>

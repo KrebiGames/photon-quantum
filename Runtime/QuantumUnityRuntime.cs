@@ -818,14 +818,17 @@ namespace Quantum {
     private QuantumCallback() {
       throw new NotSupportedException();
     }
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    
+    [Obsolete("No longer used, call Clear instead")]
     static void ResetStatics() {
       Clear();
     }
-
-    [RuntimeInitializeOnLoadMethod]
+    
+    [Obsolete("No longer used, call RegisterDefaultHandlers instead")]
     static void SetupDefaultHandlers() {
+    }
+
+    internal static void RegisterDefaultHandlers() {
       // default callbacks handlers are initialised here; if you want them disabled, implement partial
       // method IsDefaultHandlerEnabled
 
@@ -2964,7 +2967,7 @@ namespace Quantum {
       public bool TryGet(out T t, int tick) {
         t = default;
         var diff = _tick - tick;
-        if (diff >= _size || tick < _initialTick) {
+        if (diff < 0 || diff >= _size || tick < _initialTick || _initialTick == 0) {
           return false;
         }
 
@@ -20662,6 +20665,7 @@ namespace Quantum {
         metadata.StaticColliders2DIds = FoldSceneObjectIds(colliders2DSources);
         metadata.StaticColliders3DIds = FoldSceneObjectIds(colliders3DSources);
         EditorUtility.SetDirty(metadata);
+        data.ClearLegacyColliderReferences();
       }
 #endif
 #endif
@@ -20742,6 +20746,7 @@ namespace Quantum {
         var metadata = GetOrCreateMetadata(asset);
         metadata.EntityPrototypesIds = FoldSceneObjectIds(globalIds);
         EditorUtility.SetDirty(metadata);
+        data.ClearLegacyMapEntityReferences();
       }
 #endif
       so.Update();
@@ -25352,10 +25357,16 @@ namespace Quantum {
         Quantum.Allocator.Heap.Reset();
         
         Frame.InitStatic();
+        QuantumCallback.RegisterDefaultHandlers();
       } finally {
         // clear the failed cache; static initializing is fragile and some assets might fail being discovered
         QuantumGlobalScriptableObject.ClearTypesFailedToLoad();
       }
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void Clear() {
+      QuantumCallback.Clear();
     }
   }
 }

@@ -24,6 +24,13 @@ namespace Quantum {
     BakeMode _autoBakeMode = BakeMode.OnValidate;
 
     /// <summary>
+    /// How frequently the ragdoll is updated
+    /// </summary>
+    [InlineHelp]
+    [SerializeField]
+    Animator _animator;
+
+    /// <summary>
     /// The filter for parts that will be updated or ignored during baking.
     /// </summary>
     [InlineHelp]
@@ -95,12 +102,16 @@ namespace Quantum {
 
       [InlineHelp][SerializeField] public BoneDirection _limbUpDirection;
       [InlineHelp][SerializeField] public float _limbThickness;
+      [InlineHelp][SerializeField] public float _chestThickness;
+      [InlineHelp][SerializeField] public float _chestForwardOffset;
+      [InlineHelp][SerializeField] public float _bellyThickness;
+      [InlineHelp][SerializeField] public float _bellyForwardOffset;
       [InlineHelp][SerializeField] public float _jointDistance;
       [InlineHelp][SerializeField] public float _headSize;
       [InlineHelp][SerializeField] public float _headDistance;
       [InlineHelp][SerializeField] public float _totalMass;
-
-
+      [InlineHelp][SerializeField] public float _generalDrag;
+      [InlineHelp][SerializeField] public AssetRef<PhysicsMaterial> _physicsMaterial;
       [InlineHelp][SerializeField] public Transform _root;
       [InlineHelp][SerializeField] public Transform _hip;
       [InlineHelp][SerializeField] public Transform _chest;
@@ -122,6 +133,25 @@ namespace Quantum {
         if (gameObject.TryGetComponent<T>(out var cmp)) {
           return cmp;
         }
+#if UNITY_EDITOR
+        // if the component exists on the prefab asset but was removed on this instance, revert the
+        // removed-component override and reuse the original component instead of adding a new one,
+        // which would create a redundant added-component override on top of the removal
+        if (UnityEditor.PrefabUtility.IsPartOfPrefabInstance(gameObject)) {
+          var instanceRoot = UnityEditor.PrefabUtility.GetOutermostPrefabInstanceRoot(gameObject);
+          if (instanceRoot != null) {
+            foreach (var removed in UnityEditor.PrefabUtility.GetRemovedComponents(instanceRoot)) {
+              if (removed.containingInstanceGameObject == gameObject && removed.assetComponent is T) {
+                removed.Revert(UnityEditor.InteractionMode.AutomatedAction);
+                break;
+              }
+            }
+            if (gameObject.TryGetComponent<T>(out cmp)) {
+              return cmp;
+            }
+          }
+        }
+#endif
         return gameObject.AddComponent<T>();
       }
 
@@ -137,6 +167,7 @@ namespace Quantum {
 
         limb.TransformMode = QuantumEntityPrototypeTransformMode.Transform3D;
         limb.PhysicsCollider.IsEnabled = true;
+        limb.PhysicsCollider.Material = _physicsMaterial;
         var capsuleHeight = (Vector3.Distance(from.position, to.position) - _jointDistance) / extentScaleFactor;
         var up = Vector3.zero;
         switch (_limbUpDirection) {
@@ -148,12 +179,14 @@ namespace Quantum {
 
         limb.PhysicsCollider.Shape3D = new Shape3DConfig() {
           ShapeType = Shape3DType.Capsule,
-          CapsuleRadius = (_limbThickness / radiusScaleFactor).ToFP(),
+          CapsuleRadius = (_limbThickness).ToFP(),
           CapsuleHeight = (capsuleHeight).ToFP(),
           PositionOffset = (up * ((capsuleHeight / 2) + (_jointDistance / extentScaleFactor / 2))).ToFPVector3(),
         };
         limb.PhysicsBody.IsEnabled = true;
         limb.PhysicsBody.Mass = (massPercent * _totalMass).ToFP();
+        limb.PhysicsBody.AngularDrag = (_generalDrag).ToFP();
+        limb.PhysicsBody.Drag = (_generalDrag).ToFP();
       }
 
       void CreateLimbAndConnectAt(Transform start, Transform end, Transform connectedAt, float massPercent, int depth, Vector3 achorOffset, Vector3 connectedOffset, Vector3 twist, Vector3 swing, FP lowAngle, FP upperAngle, FP swing1, FP swing2, bool computeRelative = false) {
@@ -216,7 +249,7 @@ namespace Quantum {
         }
 
         if (_chest != null) {
-          chestPosition = _root.InverseTransformPoint(_chest.transform.position);
+          chestPosition = InverseTransformPoint(_root, _chest.transform.position);
         }
 
         var rightArmPosition = InverseTransformPoint(_root, new Vector3(0.8f, 0.2f, 0));
@@ -256,13 +289,13 @@ namespace Quantum {
           // update the offset of the hips to match with the distance of the chest and legs
           var offset = (-Vector3.up * hipHeightExtent) - midLegs;
           offset += hipsPosition - Vector3.up * _jointDistance;
-          offset += Vector3.forward * 0.05f;
+          offset += Vector3.forward * _bellyForwardOffset;
 
           offset.x /= hips.transform.lossyScale.x;
           offset.y /= hips.transform.lossyScale.y;
           offset.z /= hips.transform.lossyScale.z;
 
-          var boxExtents = Vector3.right * hipWidthExtent + Vector3.up * hipHeightExtent + (Vector3.forward * _limbThickness);
+          var boxExtents = Vector3.right * hipWidthExtent + Vector3.up * hipHeightExtent + (Vector3.forward * (_limbThickness + _bellyThickness));
           boxExtents.x /= hips.transform.lossyScale.x;
           boxExtents.y /= hips.transform.lossyScale.y;
           boxExtents.z /= hips.transform.lossyScale.z;
@@ -270,6 +303,7 @@ namespace Quantum {
           // add the shape config with transform, collider, body and box shape
           hips.TransformMode = QuantumEntityPrototypeTransformMode.Transform3D;
           hips.PhysicsCollider.IsEnabled = true;
+          hips.PhysicsCollider.Material = _physicsMaterial;
           hips.PhysicsBody.Mass = (HipsMass * _totalMass).ToFP();
           hips.PhysicsBody.IsEnabled = true;
           hips.PhysicsCollider.Shape3D = new Shape3DConfig() {
@@ -290,15 +324,16 @@ namespace Quantum {
 
           // add the shape config with transform, collider, body and box shape
           var offset = -Vector3.up * 1.1f * -chestHeightExtent / _chest.transform.lossyScale.y;
-          //var offset = Vector3.zero;
+          offset += Vector3.forward * _chestForwardOffset;
 
-          var boxExtents = Vector3.right * chestWidthExtent + Vector3.up * chestHeightExtent + (Vector3.forward * _limbThickness);
+          var boxExtents = Vector3.right * chestWidthExtent + Vector3.up * chestHeightExtent + (Vector3.forward * (_limbThickness + _chestThickness));
           boxExtents.x /= chest.transform.lossyScale.x;
           boxExtents.y /= chest.transform.lossyScale.y;
           boxExtents.z /= chest.transform.lossyScale.z;
 
           chest.TransformMode = QuantumEntityPrototypeTransformMode.Transform3D;
           chest.PhysicsCollider.IsEnabled = true;
+          chest.PhysicsCollider.Material = _physicsMaterial;
           chest.PhysicsBody.IsEnabled = true;
           chest.PhysicsBody.Mass = (ChestMass * _totalMass).ToFP();
           chest.PhysicsCollider.Shape3D = new Shape3DConfig() {
@@ -308,7 +343,7 @@ namespace Quantum {
           };
 
           // connects the chest to the hips since the hips is the center of mass
-          var anchorOffset =  InverseTransformPoint(_root, _chest.position) - midBody;
+          var anchorOffset = InverseTransformPoint(_root, _chest.position) - midBody;
           var connectedOffset = midBody - InverseTransformPoint(_root, _hip.position);
 
           if (_hip != null) {
@@ -342,19 +377,20 @@ namespace Quantum {
 
           head.TransformMode = QuantumEntityPrototypeTransformMode.Transform3D;
           head.PhysicsCollider.IsEnabled = true;
+          head.PhysicsCollider.Material = _physicsMaterial;
           var radiusScaleFactor = Math.Min(_head.transform.lossyScale.x, _head.transform.lossyScale.z);
           head.PhysicsCollider.Shape3D = new Shape3DConfig() {
             ShapeType = Shape3DType.Sphere,
-            SphereRadius = (_headSize / radiusScaleFactor).ToFP(),
-            PositionOffset = FPVector3.Up * (_headDistance / _head.transform.lossyScale.y).ToFP(),
+            SphereRadius = (_headSize).ToFP(),
+            PositionOffset = FPVector3.Up * _headDistance.ToFP(),
           };
           head.PhysicsBody.IsEnabled = true;
           head.PhysicsBody.Mass = (_totalMass * HeadMass).ToFP();
 
           // link the head into the chest
           if (_chest != null) {
-            var headAnchor = Vector3.down * head.PhysicsCollider.Shape3D.SphereRadius.AsFloat;
-            var chestAnchor = headPosition - chestPosition + headAnchor;
+            var headAnchor = Vector3.zero;
+            var chestAnchor = headPosition - chestPosition;
             var joint = AddOrGet<QPrototypePhysicsJoints3D>(_head.gameObject);
             joint.Prototype.JointConfigs = new Prototypes.Unity.Joint3DConfig[]{
               new (){
@@ -384,10 +420,10 @@ namespace Quantum {
             Vector3.zero,
             twist: FixAxis(_rightArm.up, Vector3.up),
             swing: FixAxis(_rightArm.forward, Vector3.forward),
-            lowAngle: -70,
-            upperAngle: 10,
-            swing1: 50,
-            swing2: 3,
+            lowAngle: -90,
+            upperAngle: 50,
+            swing1: 90,
+            swing2: 15,
             computeRelative: true
           );
 
@@ -414,10 +450,10 @@ namespace Quantum {
             Vector3.zero,
             twist: FixAxis(_leftArm.up, Vector3.up),
             swing: FixAxis(_leftArm.forward, Vector3.forward),
-            lowAngle: -70,
-            upperAngle: 10,
-            swing1: 50,
-            swing2: 3,
+            lowAngle: -90,
+            upperAngle: 50,
+            swing1: 90,
+            swing2: 15,
             computeRelative: true
           );
 
@@ -447,9 +483,9 @@ namespace Quantum {
             Vector3.zero,
             twist: FixAxis(_rightLeg.right, Vector3.right),
             swing: FixAxis(_rightLeg.forward, Vector3.forward),
-            lowAngle: -20,
-            upperAngle: 70,
-            swing1: 30,
+            lowAngle: -50,
+            upperAngle: 90,
+            swing1: 50,
             swing2: 3,
             computeRelative: true
           );
@@ -477,9 +513,9 @@ namespace Quantum {
             Vector3.zero,
             twist: FixAxis(_leftLeg.right, Vector3.right),
             swing: FixAxis(_leftLeg.forward, Vector3.forward),
-            lowAngle: -20,
-            upperAngle: 70,
-            swing1: 30,
+            lowAngle: -50,
+            upperAngle: 90,
+            swing1: 50,
             swing2: 3,
             computeRelative: true
           );
@@ -512,6 +548,64 @@ namespace Quantum {
       });
     }
 
+    private Transform GetBone(params HumanBodyBones[] bones) {
+      foreach (var bone in bones) {
+        Transform t = _animator.GetBoneTransform(bone);
+        if (t != null)
+          return t;
+      }
+
+      return null;
+    }
+
+    public void TrySetAnimator(Animator animator) {
+      if (animator != null) {
+        Settings._hip = GetBone(HumanBodyBones.Hips);
+        Settings._chest = GetBone(HumanBodyBones.Chest);
+        Settings._head = GetBone(HumanBodyBones.Head);
+
+        // left arm and elbow
+        Settings._leftArm = GetBone(HumanBodyBones.LeftUpperArm);
+        Settings._leftElbow = GetBone(HumanBodyBones.LeftLowerArm);
+
+        // left hand
+        Settings._leftHand = GetBone(
+            HumanBodyBones.LeftIndexDistal,
+            HumanBodyBones.LeftHand
+        );
+
+        // right arm and elbow
+        Settings._rightArm = GetBone(HumanBodyBones.RightUpperArm);
+        Settings._rightElbow = GetBone(HumanBodyBones.RightLowerArm);
+
+        // right hand
+        Settings._rightHand = GetBone(
+            HumanBodyBones.RightIndexDistal,
+            HumanBodyBones.RightHand
+        );
+
+        // left leg and knee
+        Settings._leftLeg = GetBone(HumanBodyBones.LeftUpperLeg);
+        Settings._leftKnee = GetBone(HumanBodyBones.LeftLowerLeg);
+
+        // left foot
+        Settings._leftFoot = GetBone(
+            HumanBodyBones.LeftToes,
+            HumanBodyBones.LeftFoot
+        );
+
+        // left leg and knee
+        Settings._rightLeg = GetBone(HumanBodyBones.RightUpperLeg);
+        Settings._rightKnee = GetBone(HumanBodyBones.RightLowerLeg);
+
+        // right foot
+        Settings._rightFoot = GetBone(
+            HumanBodyBones.RightToes,
+            HumanBodyBones.RightFoot
+        );
+      }
+    }
+
     void LateUpdate() {
       LimbUpdates.Sort();
       foreach (var update in LimbUpdates) {
@@ -522,19 +616,121 @@ namespace Quantum {
     }
 
     public void BuildRagdoll() {
+      TrySetAnimator(_animator);
       Settings.BuildRagDoll(_partsToUpdate);
+#if UNITY_EDITOR
+      ScheduleStaleLimbCleanup();
+#endif
     }
 
-    void OnValidate() {
-      if(_autoBakeMode == BakeMode.OnValidate) {
-        Settings.BuildRagDoll(_partsToUpdate);
+#if UNITY_EDITOR
+    bool _cleanupScheduled;
+
+    void ScheduleStaleLimbCleanup() {
+      // destroying components is not allowed during OnValidate, so the cleanup runs on the next editor update
+      if (_cleanupScheduled) {
+        return;
       }
+      _cleanupScheduled = true;
+      UnityEditor.EditorApplication.delayCall += () => {
+        _cleanupScheduled = false;
+        if (this == null || Application.isPlaying) {
+          return;
+        }
+        CleanupStaleLimbs();
+      };
+    }
+
+    /// <summary>
+    /// Removes the baked components (<see cref="QuantumEntityPrototype"/>, <see cref="QuantumRagdollLimbView"/> and
+    /// <see cref="QPrototypePhysicsJoints3D"/>) from transforms that were baked by this ragdoll before but are no
+    /// longer assigned as limbs in <see cref="Settings"/>.
+    public void CleanupStaleLimbs() {
+      if (UnityEditor.PrefabUtility.IsPartOfPrefabAsset(this)) {
+        // the imported prefab asset objects cannot be modified directly; the cleanup runs in the prefab stage instead
+        return;
+      }
+
+      var limbs = new HashSet<Transform>();
+      if (Settings._hip != null) limbs.Add(Settings._hip);
+      if (Settings._chest != null) limbs.Add(Settings._chest);
+      if (Settings._head != null) limbs.Add(Settings._head);
+      if (Settings._leftArm != null) limbs.Add(Settings._leftArm);
+      if (Settings._leftElbow != null) limbs.Add(Settings._leftElbow);
+      if (Settings._rightArm != null) limbs.Add(Settings._rightArm);
+      if (Settings._rightElbow != null) limbs.Add(Settings._rightElbow);
+      if (Settings._leftLeg != null) limbs.Add(Settings._leftLeg);
+      if (Settings._leftKnee != null) limbs.Add(Settings._leftKnee);
+      if (Settings._rightLeg != null) limbs.Add(Settings._rightLeg);
+      if (Settings._rightKnee != null) limbs.Add(Settings._rightKnee);
+
+      CleanupStaleLimbsInHierarchy(transform, limbs);
+      if (_animator != null && _animator.transform.IsChildOf(transform) == false) {
+        CleanupStaleLimbsInHierarchy(_animator.transform, limbs);
+      }
+    }
+
+    void CleanupStaleLimbsInHierarchy(Transform hierarchyRoot, HashSet<Transform> limbs) {
+      foreach (var view in hierarchyRoot.GetComponentsInChildren<QuantumRagdollLimbView>(true)) {
+        if (view.Ragdoll != null && view.Ragdoll != this) continue;
+        if (limbs.Contains(view.transform)) continue;
+        RemoveLimbComponents(view.gameObject);
+      }
+    }
+
+    void RemoveLimbComponents(GameObject limb) {
+      // the component prototypes require the entity prototype, so they are removed first
+      if (limb.TryGetComponent<QPrototypePhysicsJoints3D>(out var joints)) {
+        RemoveComponent(joints);
+      }
+      if (limb.TryGetComponent<QuantumRagdollLimbView>(out var view)) {
+        RemoveComponent(view);
+      }
+      if (limb.TryGetComponent<QuantumEntityPrototype>(out var prototype)) {
+        // the entity prototype is kept while any component prototype still requires it,
+        // either one skipped above or one not baked by the ragdoll
+        if (limb.GetComponent<QuantumUnityComponentPrototype>() == null) {
+          RemoveComponent(prototype);
+        }
+      }
+    }
+
+    static void RemoveComponent(Component component) {
+      if (UnityEditor.PrefabUtility.IsPartOfPrefabInstance(component) &&
+          UnityEditor.PrefabUtility.IsAddedComponentOverride(component) == false) {
+        return;
+      }
+      UnityEditor.Undo.DestroyObjectImmediate(component);
+    }
+#endif
+
+    void OnValidate() {
+      if (_autoBakeMode == BakeMode.OnValidate) {
+        BuildRagdoll();
+      }
+      Settings._limbThickness = Mathf.Max(0.001f, Settings._limbThickness);
+      Settings._chestThickness = Mathf.Max(0.001f, Settings._chestThickness);
+      Settings._bellyThickness = Mathf.Max(0.001f, Settings._bellyThickness);
+      Settings._jointDistance = Mathf.Max(0.001f, Settings._jointDistance);
+      Settings._headSize = Mathf.Max(0.001f, Settings._headSize);
+      Settings._totalMass = Mathf.Max(0.001f, Settings._totalMass);
+      Settings._generalDrag = Mathf.Max(0f, Settings._generalDrag);
     }
 
     void Update() {
       if (Application.isPlaying == false && _autoBakeMode == BakeMode.Immediate) {
-        Settings.BuildRagDoll(_partsToUpdate);
+        BuildRagdoll();
       }
+    }
+
+    private void Reset() {
+      Settings._limbThickness = 0.18f;
+      Settings._jointDistance = 0.05f;
+      Settings._headSize = 0.4f;
+      Settings._headDistance = 0.1f;
+      Settings._totalMass = 70;
+      Settings._generalDrag = 1f;
+      Settings._limbUpDirection = BoneDirection.Y;
     }
   }
 }

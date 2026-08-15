@@ -1030,6 +1030,11 @@
             How frequently the ragdoll is updated
             </summary>
         </member>
+        <member name="F:Quantum.QuantumRagdoll._animator">
+            <summary>
+            How frequently the ragdoll is updated
+            </summary>
+        </member>
         <member name="F:Quantum.QuantumRagdoll._partsToUpdate">
             <summary>
             The filter for parts that will be updated or ignored during baking.
@@ -1063,6 +1068,7 @@
             Disable the ragdoll update.
             </summary>
         </member>
+        <!-- Badly formed XML comment ignored for member "M:Quantum.QuantumRagdoll.CleanupStaleLimbs" -->
         <member name="T:Quantum.QuantumLoadBalancingClient">
             <summary>
             Obsolete: Not used anymore. Replace by using RealtimeClient directly.
@@ -1442,6 +1448,21 @@
         <member name="F:Quantum.QuantumEntityPrototypeTransformMode.None">
             <summary>
             No transform component.
+            </summary>
+        </member>
+        <member name="T:Quantum.Prototypes.Unity.EntityGroupPrototypeMode">
+            <summary>
+            How entities are filled in an EntityGroup Prototype.
+            </summary>
+        </member>
+        <member name="F:Quantum.Prototypes.Unity.EntityGroupPrototypeMode.Manual">
+            <summary>
+            Entities must be enumerated manually.
+            </summary>
+        </member>
+        <member name="F:Quantum.Prototypes.Unity.EntityGroupPrototypeMode.Children">
+            <summary>
+            Entities children to the group owner are automatically added to the group, except the owner.
             </summary>
         </member>
         <member name="T:Quantum.MultiTypeReferenceAttribute">
@@ -2484,6 +2505,11 @@
         <member name="M:Quantum.QuantumEntityView.OnGameChanged">
             <summary>
             A callback to override to add custom logic when the associate game has changed on the connected <see cref="T:Quantum.QuantumEntityViewUpdater"/>.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumEntityView.DeactivateForManualDisposal">
+            <summary>
+            Minimum version of disposal that is removing snapshot subscriptions.
             </summary>
         </member>
         <member name="M:Quantum.QuantumEntityView.TryGetTransform3DData(Quantum.QuantumEntityViewTimeReference,Quantum.QuantumEntityView.UpdatePositionParameter@,System.Int32@,Quantum.Transform3D@,System.Boolean)">
@@ -4085,21 +4111,6 @@
         <member name="M:Quantum.NavMeshBakerBenchmarkerProgressBar.Dispose">
             <summary>
             Complete, dispose the progress bar and logs a result.
-            </summary>
-        </member>
-        <member name="T:Quantum.Prototypes.Unity.EntityGroupPrototypeMode">
-            <summary>
-            How entities are filled in an EntityGroup Prototype.
-            </summary>
-        </member>
-        <member name="F:Quantum.Prototypes.Unity.EntityGroupPrototypeMode.Manual">
-            <summary>
-            Entities must be enumerated manually.
-            </summary>
-        </member>
-        <member name="F:Quantum.Prototypes.Unity.EntityGroupPrototypeMode.Children">
-            <summary>
-            Entities children to the group owner are automatically added to the group, except the owner.
             </summary>
         </member>
         <member name="T:Quantum.QuantumCallback">
@@ -8358,7 +8369,12 @@
         </member>
         <member name="F:Quantum.QuantumRagdollLimbView._ragdollView">
             <summary>
-            A reference to the Unity's ragdoll editor. It will update 
+            A reference to the Unity's ragdoll editor. It will update
+            </summary>
+        </member>
+        <member name="P:Quantum.QuantumRagdollLimbView.Ragdoll">
+            <summary>
+            The <see cref="T:Quantum.QuantumRagdoll"/> that baked this limb. Used to track the ownership of the baked components.
             </summary>
         </member>
         <member name="M:Quantum.QuantumRagdollLimbView.SetRoot(Quantum.QuantumRagdoll,System.Int32)">
