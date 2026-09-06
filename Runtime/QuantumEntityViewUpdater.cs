@@ -488,7 +488,7 @@ namespace Quantum {
     }
 
     void CreateViewIfNeeded(QuantumGame game, Frame frame, EntityRef handle, View view, QuantumEntityViewBindBehaviour createBehaviour) {
-      var entityView = frame.FindAsset<EntityView>(view.Current.Id);
+      var entityView = frame.FindAsset(view.Current);
 
       if (_activeViews.TryGetValue(handle, out var instance)) {
         var bindBehaviour = instance.BindBehaviour;
@@ -620,7 +620,7 @@ namespace Quantum {
       Assert.Check(_mapData);
 
       var mapEntityViews = _mapData.MapEntityReferences;
-      if (mapEntityViews.Count <= mapEntity.Index) {
+      if (mapEntity.Index < 0 || mapEntityViews.Count <= mapEntity.Index) {
         Log.Error($"MapData on '{_mapData.gameObject.scene.path}' does not have a map entity slot with an index {mapEntity.Index} (entity: {handle}). EntityView will not be assigned. Make sure all baked data is up to date.");
         return null;
       }

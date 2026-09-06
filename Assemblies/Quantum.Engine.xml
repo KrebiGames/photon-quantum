@@ -3244,6 +3244,14 @@
             <param name="assetRef">The asset reference.</param>
             <returns>The loaded asset object or <c>null</c>, if not found.</returns>
         </member>
+        <member name="M:Quantum.IResourceManagerExtensions.GetAsset``2(``0,Quantum.AssetRef{``1})">
+            <summary>
+            Returns the asset object of the provided asset reference.
+            </summary>
+            <param name="resourceManager">The resource manager.</param>
+            <param name="assetRef">The asset reference.</param>
+            <returns>The loaded asset object or <c>null</c>, if not found.</returns>
+        </member>
         <member name="M:Quantum.IResourceManagerExtensions.TryGetAsset``2(``0,Quantum.AssetGuid,``1@)">
             <summary>
             Tries to get an asset of type T from the resource manager. Note that if type T is not the same as the asset type,
@@ -4015,6 +4023,29 @@
             A struct-of-arrays data structure divided into fixed-capacity segments.
             </summary>
         </member>
+        <member name="T:Quantum.Core.TableBlockResolver">
+            <summary>
+            A cursor over a <see cref="T:Quantum.Core.ComponentDataTable"/> and one of its blocks. Caches per-column location and
+            copy-on-write state, grants owned access to block columns (triggering copy-on-write) and creates
+            resolved <see cref="T:Quantum.Core.ComponentRef"/>s for individual rows.
+            <para>
+            Callers own a <see cref="T:Quantum.Core.TableBlockResolver.Column"/> per component and must resolve them in this order: <see cref="M:Quantum.Core.TableBlockResolver.ResolveTableColumn(Quantum.Core.TableBlockResolver.Column@)"/>
+            whenever <see cref="M:Quantum.Core.TableBlockResolver.Next(Quantum.EntityRef@,System.Void*@,System.Boolean@,System.Boolean@)"/> reports a new table, <see cref="M:Quantum.Core.TableBlockResolver.ResolveTableBlock(Quantum.Core.TableBlockResolver.Column@)"/> whenever it reports a new block,
+            and <see cref="M:Quantum.Core.TableBlockResolver.ResolveSparse(Quantum.Core.TableBlockResolver.Column@)"/> for every entity (it is a no-op for columns the current table has).
+            </para>
+            <para>
+            Per entity, all <see cref="M:Quantum.Core.TableBlockResolver.EnsureOwned(Quantum.Core.TableBlockResolver.Column@)"/> calls must come strictly before the first <see cref="M:Quantum.Core.TableBlockResolver.TryCreateRef(Quantum.Core.TableBlockResolver.Column@,Quantum.Core.ComponentRef@,System.Byte*@)"/>:
+            TryCreateRef bakes the column's current owned/borrowed state into the ref and the returned pointer,
+            so owning a column afterwards leaves refs handed out earlier pointing at the borrowed copy.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Quantum.Core.TableBlockResolver.GetEntityData(Quantum.Core.TableBlockResolver.Column@)">
+            <summary>
+            The entity's own value in <paramref name="column"/>. While a table is iterated
+            <see cref="F:Quantum.Core.TableBlockResolver.Column.Data"/> points at the block start, not at this entity.
+            </summary>
+        </member>
         <member name="T:Quantum.Core.FrameBase">
             <summary>
              The Frame class is the container for all the transient and static game state data, including the API for entities, physics, assets and others.
@@ -4115,9 +4146,145 @@
             <param name="without">Components that should not be present</param>
             <param name="any">Components that should be present</param>
         </member>
+        <member name="M:Quantum.Core.FrameBase.FilterRef``1(Quantum.ComponentSet,Quantum.ComponentSet)">
+            <summary>
+            Filter entities by component types and returns references (instead of copies or unsafe pointers).
+            </summary> 
+            <typeparam name="T0">Ref or ReadOnlyRef on a component type</typeparam>
+            <param name="without">Components that should not be present</param>
+            <param name="any">Components that should be present</param>
+            <remarks>
+            When using copy-on-write, read-only references obtained from the filter might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FilterRef``2(Quantum.ComponentSet,Quantum.ComponentSet)">
+            <summary>
+            Filter entities by component types and returns references (instead of copies or unsafe pointers).
+            </summary> 
+            <typeparam name="T0">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T1">Ref or ReadOnlyRef on a component type</typeparam>
+            <param name="without">Components that should not be present</param>
+            <param name="any">Components that should be present</param>
+            <remarks>
+            When using copy-on-write, read-only references obtained from the filter might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FilterRef``3(Quantum.ComponentSet,Quantum.ComponentSet)">
+            <summary>
+            Filter entities by component types and returns references (instead of copies or unsafe pointers).
+            </summary> 
+            <typeparam name="T0">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T1">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T2">Ref or ReadOnlyRef on a component type</typeparam>
+            <param name="without">Components that should not be present</param>
+            <param name="any">Components that should be present</param>
+            <remarks>
+            When using copy-on-write, read-only references obtained from the filter might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FilterRef``4(Quantum.ComponentSet,Quantum.ComponentSet)">
+            <summary>
+            Filter entities by component types and returns references (instead of copies or unsafe pointers).
+            </summary> 
+            <typeparam name="T0">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T1">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T2">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T3">Ref or ReadOnlyRef on a component type</typeparam>
+            <param name="without">Components that should not be present</param>
+            <param name="any">Components that should be present</param>
+            <remarks>
+            When using copy-on-write, read-only references obtained from the filter might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FilterRef``5(Quantum.ComponentSet,Quantum.ComponentSet)">
+            <summary>
+            Filter entities by component types and returns references (instead of copies or unsafe pointers).
+            </summary> 
+            <typeparam name="T0">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T1">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T2">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T3">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T4">Ref or ReadOnlyRef on a component type</typeparam>
+            <param name="without">Components that should not be present</param>
+            <param name="any">Components that should be present</param>
+            <remarks>
+            When using copy-on-write, read-only references obtained from the filter might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FilterRef``6(Quantum.ComponentSet,Quantum.ComponentSet)">
+            <summary>
+            Filter entities by component types and returns references (instead of copies or unsafe pointers).
+            </summary> 
+            <typeparam name="T0">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T1">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T2">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T3">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T4">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T5">Ref or ReadOnlyRef on a component type</typeparam>
+            <param name="without">Components that should not be present</param>
+            <param name="any">Components that should be present</param>
+            <remarks>
+            When using copy-on-write, read-only references obtained from the filter might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FilterRef``7(Quantum.ComponentSet,Quantum.ComponentSet)">
+            <summary>
+            Filter entities by component types and returns references (instead of copies or unsafe pointers).
+            </summary> 
+            <typeparam name="T0">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T1">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T2">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T3">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T4">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T5">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T6">Ref or ReadOnlyRef on a component type</typeparam>
+            <param name="without">Components that should not be present</param>
+            <param name="any">Components that should be present</param>
+            <remarks>
+            When using copy-on-write, read-only references obtained from the filter might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FilterRef``8(Quantum.ComponentSet,Quantum.ComponentSet)">
+            <summary>
+            Filter entities by component types and returns references (instead of copies or unsafe pointers).
+            </summary> 
+            <typeparam name="T0">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T1">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T2">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T3">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T4">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T5">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T6">Ref or ReadOnlyRef on a component type</typeparam>
+            <typeparam name="T7">Ref or ReadOnlyRef on a component type</typeparam>
+            <param name="without">Components that should not be present</param>
+            <param name="any">Components that should be present</param>
+            <remarks>
+            When using copy-on-write, read-only references obtained from the filter might not observe writes made elsewhere.
+            </remarks>
+        </member>
         <member name="T:Quantum.Core.FrameBase.EntitiesConfig">
             <summary>
             Global entities configuration
+            </summary>
+        </member>
+        <member name="T:Quantum.Core.FrameBase.EntitiesConfig.FrameCopyMode">
+            <summary>
+            Indicates the manner in which the predicted frame copies from the verified frame. 
+            </summary>
+        </member>
+        <member name="F:Quantum.Core.FrameBase.EntitiesConfig.FrameCopyMode.Full">
+            <summary>
+            When the predicted frame copies from the verified frame, it copies all blocks.
+            </summary>
+        </member>
+        <member name="F:Quantum.Core.FrameBase.EntitiesConfig.FrameCopyMode.Diff">
+            <summary>
+            When the predicted frame copies from the verified frame, it only copies blocks that were write-accessed after the last copy.
+            </summary>
+        </member>
+        <member name="F:Quantum.Core.FrameBase.EntitiesConfig.CopyMode">
+            <summary>
+            Configures how verified component data is copied for client-side prediction.
             </summary>
         </member>
         <member name="F:Quantum.Core.FrameBase.EntitiesConfig.CommitCommandsMode">
@@ -4136,6 +4303,17 @@
         <member name="F:Quantum.Core.FrameBase.EntitiesConfig.DefaultComponentBlockCapacity">
             <summary>
             Default value for how many components are stored together in a continuous block of memory. Default is 128.
+            </summary>
+        </member>
+        <member name="F:Quantum.Core.FrameBase.EntitiesConfig.DefaultTableBlockCapacity">
+            <summary>
+            How many entities a table can store together in a continuous block of memory. Default is 128.
+            </summary>
+        </member>
+        <member name="F:Quantum.Core.FrameBase.EntitiesConfig.ForceSparseSetStorageOnAllComponents">
+            <summary>
+            Forces all components to have sparse set storage, ignoring <see cref="F:Quantum.ComponentFlags.Table"/> on
+            components that ask for table storage.
             </summary>
         </member>
         <member name="F:Quantum.Core.FrameBase.EntitiesConfig.ComponentTypeConfiguration">
@@ -4786,6 +4964,96 @@
             <exception cref="T:System.InvalidOperationException">Thrown when the entity does not exist</exception>
             \ingroup EntityApi
         </member>
+        <member name="M:Quantum.Core.FrameBase.GetReadOnlyRef``1(Quantum.EntityRef)">
+            <summary>
+            Returns a read-only reference to a component.
+            </summary>
+            <typeparam name="T">Component type</typeparam>
+            <param name="entityRef">Entity reference</param>
+            <returns>Read-only reference to the requested component</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when the entity does not exist.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when the entity does not have the requested component type.</exception>
+            <para>Always check the availability of the component with <see cref="M:Quantum.Core.FrameBase.Has``1(Quantum.EntityRef)"/> before using this method.</para>
+            <remarks>
+            When using copy-on-write, the returned read-only reference might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.GetReadOnlyRef(Quantum.EntityRef,System.Int32)">
+            <summary>
+            Returns a read-only reference to a component.
+            </summary>
+            <param name="entityRef">Entity reference</param>
+            <param name="componentIndex">Component index defined by <see cref="F:Quantum.ComponentTypeId`1.Id"/></param>
+            <returns>Read-only reference to the requested component</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when the entity does not exist.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when the requested component index is invalid.</exception>
+            <remarks>
+            When using copy-on-write, the returned read-only reference might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.TryGetReadOnlyRef``1(Quantum.EntityRef,Quantum.ReadOnlyRef{``0}@)">
+            <summary>
+            Similar to <see cref="M:Quantum.Core.FrameBase.GetReadOnlyRef``1(Quantum.EntityRef)"/> but does not throw an exception if the component is not present.
+            </summary>
+            <typeparam name="T">Component type</typeparam>
+            <param name="entityRef">Entity reference</param>
+            <param name="value">Read-only reference to the requested component (if returns <see langword="true"/>)</param>
+            <returns><see langword="true"/> if component was found</returns>
+            <remarks>
+            When using copy-on-write, the returned read-only reference might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.TryGetReadOnlyRef(Quantum.EntityRef,System.Int32,Quantum.ReadOnlyRef@)">
+            <summary>
+            Similar to <see cref="M:Quantum.Core.FrameBase.GetReadOnlyRef(Quantum.EntityRef,System.Int32)"/> but does not throw an exception if the component is not present.
+            </summary>
+            <param name="entityRef">Entity reference</param>
+            <param name="componentIndex">Component index defined by <see cref="F:Quantum.ComponentTypeId`1.Id"/></param>
+            <param name="value">Read-only reference to the requested component (if returns <see langword="true"/>)</param>
+            <returns><see langword="true"/> if component was found</returns>
+            <remarks>
+            When using copy-on-write, the returned read-only reference might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.GetRef``1(Quantum.EntityRef)">
+            <summary>
+            Returns a reference to a component, allowing it to be modified directly without <see cref="M:Quantum.Core.FrameBase.Set``1(Quantum.EntityRef,``0)"/>.
+            </summary>
+            <typeparam name="T">Component type</typeparam>
+            <param name="entityRef">Entity reference</param>
+            <returns>Reference to the requested component</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when the entity does not exist.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when the entity does not have the requested component type.</exception>
+            <para>Always check the availability of the component with <see cref="M:Quantum.Core.FrameBase.Has``1(Quantum.EntityRef)"/> before using this method.</para>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.GetRef(Quantum.EntityRef,System.Int32)">
+            <summary>
+            Returns a reference to a component, allowing it to be modified directly without <see cref="M:Quantum.Core.FrameBase.Set(Quantum.EntityRef,System.Int32,System.Void*)"/>.
+            </summary>
+            <param name="entityRef">Entity reference</param>
+            <param name="componentIndex">Component index defined by <see cref="F:Quantum.ComponentTypeId`1.Id"/></param>
+            <returns>Reference to the requested component</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when the entity does not exist.</exception>
+            <exception cref="T:System.InvalidOperationException">Thrown when the requested component index is invalid.</exception>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.TryGetRef``1(Quantum.EntityRef,Quantum.Ref{``0}@)">
+            <summary>
+            Similar to <see cref="M:Quantum.Core.FrameBase.GetRef``1(Quantum.EntityRef)"/> but does not throw an exception if the component is not present.
+            </summary>
+            <typeparam name="T">Component type</typeparam>
+            <param name="entityRef">Entity reference</param>
+            <param name="value">Reference to the requested component (if returns <see langword="true"/>)</param>
+            <returns><see langword="true"/> if component was found</returns>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.TryGetRef(Quantum.EntityRef,System.Int32,Quantum.Ref@)">
+            <summary>
+            Similar to <see cref="M:Quantum.Core.FrameBase.GetRef(Quantum.EntityRef,System.Int32)"/> but does not throw an exception if the component is not present.
+            </summary>
+            <param name="entityRef">Entity reference</param>
+            <param name="componentIndex">Component index defined by <see cref="F:Quantum.ComponentTypeId`1.Id"/></param>
+            <param name="value">Reference to the requested component (if returns <see langword="true"/>)</param>
+            <returns><see langword="true"/> if component was found</returns>
+        </member>
         <member name="M:Quantum.Core.FrameBase.Get``1(Quantum.EntityRef)">
             <summary>
             Gets a component from an entity.
@@ -4821,6 +5089,24 @@
             <returns><see langword="true"/> if the component type exists on the entity</returns>
             <exception cref="T:System.InvalidOperationException">Thrown when the entity does not exist</exception>
             \ingroup EntityApiT
+        </member>
+        <member name="M:Quantum.Core.FrameBase.TableHasColumn(Quantum.EntityRef,System.Int32)">
+            <summary>
+            Returns <c>true</c> if the entity's current table can store the component.
+            </summary>
+            <param name="entityRef"></param>
+            <param name="componentIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.TableHasColumn(Quantum.EntityRef,System.Int32,Quantum.Core.ComponentDataTable*@,System.Int32@)">
+            <summary>
+            Returns <c>true</c> if the entity's current table can store the component. Also outputs the table and the entity's row in it.
+            </summary>
+            <param name="entityRef"></param>
+            <param name="componentIndex"></param>
+            <param name="table"></param>
+            <param name="tableRow"></param>
+            <returns></returns>
         </member>
         <member name="M:Quantum.Core.FrameBase.Remove``1(Quantum.EntityRef)">
             <summary>
@@ -4894,41 +5180,11 @@
             <example><code>var entity = f.Create();</code></example>
             \ingroup EntityApi
         </member>
-        <member name="M:Quantum.Core.FrameBase.DeferredAdd``1(Quantum.EntityRef,``0)">
+        <member name="M:Quantum.Core.FrameBase.QueueMove(Quantum.EntityRef,System.Int32)">
             <summary>
-            Queues a component to be added to an entity. Commit deferred adds using <see cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.CommitDeferred"/>.
+            Table components added to an entity are staged in the component's sparse set until CommitMoves relocates the entity.
+            StagedCount/StagedComponents keep the pending add visible to filters.
             </summary>
-            <typeparam name="T">Component type</typeparam>
-            <param name="entity">Entity ref</param>
-            <param name="value">Value of the component to be added</param>
-        </member>
-        <member name="M:Quantum.Core.FrameBase.DeferredAdd(Quantum.EntityRef,System.Int32,System.Void*)">
-            <summary>
-            Queues a component to be added to an entity. Commit deferred adds using <see cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.CommitDeferred"/>.
-            </summary>
-            <param name="entity">Entity ref</param>
-            <param name="componentIndex">Index of component type
-            Use <see cref="M:Quantum.ComponentTypeId.GetComponentIndex(System.Type)"/> or <see cref="F:Quantum.ComponentTypeId`1.Id"/> to get the index of a component type.
-            </param>
-            <param name="value">Value of the component to be added</param>
-        </member>
-        <member name="M:Quantum.Core.FrameBase.DeferredSet``1(Quantum.EntityRef,``0)">
-            <summary>
-            Queues a component to be set on an entity. Commit deferred sets using <see cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.CommitDeferred"/>.
-            </summary>
-            <typeparam name="T">Component type</typeparam>
-            <param name="entity">Entity ref</param>
-            <param name="value">Value of the component to be added</param>
-        </member>
-        <member name="M:Quantum.Core.FrameBase.DeferredSet(Quantum.EntityRef,System.Int32,System.Void*)">
-            <summary>
-            Queues a component to be set on an entity. Commit deferred sets using <see cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.CommitDeferred"/>.
-            </summary>
-            <param name="entity">Entity ref</param>
-            <param name="componentIndex">Index of component type
-            Use <see cref="M:Quantum.ComponentTypeId.GetComponentIndex(System.Type)"/> or <see cref="F:Quantum.ComponentTypeId`1.Id"/> to get the index of a component type.
-            </param>
-            <param name="value">Value of the component to be added</param>
         </member>
         <member name="M:Quantum.Core.FrameBase.Create(Quantum.AssetRef{Quantum.EntityPrototype})">
             <summary>
@@ -5443,6 +5699,35 @@
             }
             </code></example>
         </member>
+        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetComponentBlockIteratorReadOnly``1">
+            <summary>
+            Get a read-only component block iterator. Unlike <see cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetComponentBlockIterator``1"/>, the visited
+            blocks are not copy-on-write copied, at the expense of only allowing read-only access to the components.
+            </summary>
+            <typeparam name="T">Component type</typeparam>
+            <returns>Read-only block iterator</returns>
+            <remarks>Component values written through other frame APIs during the iteration may not be visible
+            through references obtained from the iterator.</remarks>
+            <example><code>
+            var region = 1UL &lt;&lt; 1;
+            foreach (var (entity, agent) in f.Unsafe.GetComponentBlockIteratorReadOnly&lt;NavMeshAgent&gt;()) {
+              var isRegionActive = agent.Value.IsNavMeshRegionActive(region);
+            }
+            </code></example>
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetComponentBlockIteratorReadOnly``1(System.Int32,System.Int32)">
+            <summary>
+            Get a read-only component block iterator, using a start offset and count. Unlike
+            <see cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetComponentBlockIterator``1(System.Int32,System.Int32)"/>, the visited blocks are not copy-on-write copied,
+            at the expense of only allowing read-only access to the components.
+            </summary>
+            <typeparam name="T">Component type</typeparam>
+            <param name="offset">Offset of entities we want</param>
+            <param name="count">How many entities we want</param>
+            <returns>Read-only block iterator</returns>
+            <remarks>Component values written through other frame APIs during the iteration may not be visible
+            through references obtained from the iterator.</remarks>
+        </member>
         <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.FilterStruct``1(Quantum.ComponentSet,Quantum.ComponentSet,System.Nullable{System.Int32},System.Nullable{System.Int32})">
             <summary>
             Returns a filtered ComponentFilterStruct instance for the specified type T.
@@ -5453,6 +5738,9 @@
             <param name="count">The optional count specifying the number of elements in the filtering result.</param>
             <typeparam name="T">The type of components to filter.</typeparam>
             <returns>A ComponentFilterStruct instance representing the filtered component collection.</returns>
+            <remarks>
+            When using copy-on-write, read-only references obtained from the filter might not observe writes made elsewhere.
+            </remarks>
         </member>
         <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.ComponentGetter``1">
             <summary>
@@ -5469,8 +5757,8 @@
             <param name="entityRef">Entity reference</param>
             <returns>Pointer to the requested component</returns>
             <exception cref="T:System.InvalidOperationException">Thrown when the entity does not exist</exception>
-            <exception cref="T:System.InvalidOperationException">Thrown when the entity does have the requested component type.</exception>
-            <para>Always check the availability of the component with <see cref="M:Quantum.Core.FrameBase.Has(Quantum.EntityRef,Quantum.ComponentSet)"/> before using this method.</para>
+            <exception cref="T:System.InvalidOperationException">Thrown when the entity does not have the requested component type.</exception>
+            <para>Always check the availability of the component with <see cref="M:Quantum.Core.FrameBase.Has``1(Quantum.EntityRef)"/> before using this method.</para>
             \ingroup EntityApi
         </member>
         <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetPointer(Quantum.EntityRef,System.Int32)">
@@ -5498,20 +5786,47 @@
             Similar to <see cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetPointer(Quantum.EntityRef,System.Int32)"/> but does not throw an exception if the component is not present.
             </summary>
             <param name="entityRef">Entity reference</param>
-            <param name="componentIndex">Component index defined by ComponentTypeId{T}.Id.</param>
+            <param name="componentIndex">Component index defined by <see cref="F:Quantum.ComponentTypeId`1.Id"/>.</param>
             <param name="value">Resulting component pointer of <see langword="null"/> if the component was not found</param>
             <returns><see langword="true"/> if component was found</returns>
             <exception cref="T:System.InvalidOperationException">Thrown when the component index is invalid.</exception>
             \ingroup EntityApi
         </member>
+        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetReadOnlyRef``1(Quantum.EntityRef)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.GetReadOnlyRef``1(Quantum.EntityRef)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetReadOnlyRef(Quantum.EntityRef,System.Int32)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.GetReadOnlyRef(Quantum.EntityRef,System.Int32)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.TryGetReadOnlyRef``1(Quantum.EntityRef,Quantum.ReadOnlyRef{``0}@)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetReadOnlyRef``1(Quantum.EntityRef,Quantum.ReadOnlyRef{``0}@)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.TryGetReadOnlyRef(Quantum.EntityRef,System.Int32,Quantum.ReadOnlyRef@)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetReadOnlyRef(Quantum.EntityRef,System.Int32,Quantum.ReadOnlyRef@)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetRef``1(Quantum.EntityRef)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.GetRef``1(Quantum.EntityRef)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetRef(Quantum.EntityRef,System.Int32)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.GetRef(Quantum.EntityRef,System.Int32)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.TryGetRef``1(Quantum.EntityRef,Quantum.Ref{``0}@)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetRef``1(Quantum.EntityRef,Quantum.Ref{``0}@)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.TryGetRef(Quantum.EntityRef,System.Int32,Quantum.Ref@)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetRef(Quantum.EntityRef,System.Int32,Quantum.Ref@)"/>
+            \ingroup EntityApi
+        </member>
         <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.CommitAllCommands">
             <summary>
-            Trigger the execution of entity and component deletion and deferred component adds and sets.
-            </summary>
-        </member>
-        <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.CommitDeferred">
-            <summary>
-            Trigger the execution of deferred component adds and sets.
+            Commits pending entity and component destruction and pending table moves. Cached component pointers will likely be invalid afterwards.
             </summary>
         </member>
         <member name="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetPointerSingleton``1">
@@ -5609,6 +5924,45 @@
             <param name="config">The configuration settings for the FrameBase instance.</param>
             <param name="maxComponents">The maximum number of components allowed.</param>
             <exception cref="T:System.NotImplementedException">Thrown if the method is not implemented.</exception>
+        </member>
+        <member name="T:Quantum.Core.ComponentRef`1">
+            <summary>
+            A pointer to a component's last known location and a version check. The pointer is reused while valid,
+            and automatically updated if the component's location has changed.
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="T:Quantum.Core.ComponentRef">
+            <summary>
+            A pointer to a component's last known location. The pointer can be reused while valid,
+            and automatically updated once marked invalid.
+            </summary>
+        </member>
+        <member name="M:Quantum.Core.ComponentRef.CreateResolved(Quantum.EntityRef,System.Int32,System.Void*,System.Void*,System.Int32,System.Int32,System.Boolean,System.Boolean)">
+            <summary>
+            Creates an already-resolved ref from caller-resolved block-column state.
+            <paramref name="isOwned"/> must be true for pointers that will be written through.
+            </summary>
+        </member>
+        <member name="P:Quantum.Core.ComponentRef.IsSettled">
+            <summary>
+            Returns <c>true</c> if the current pointer is either owned or invalid (i.e. copy-on-write has already happened or can't happen).
+            </summary>
+        </member>
+        <member name="M:Quantum.Core.ComponentRef.RefreshTableLocationUnchecked(Quantum.Core.ComponentDataTable*,System.Int32)">
+            <summary>
+            Table-component refresh with the entity's table state pre-resolved by the caller.
+            </summary>
+        </member>
+        <member name="M:Quantum.Core.ComponentRef.GetTablePointerUnchecked(Quantum.Core.ComponentDataTable*,System.Int32,Quantum.EcsAccess)">
+            <summary>
+            <see cref="M:Quantum.Core.ComponentRef.GetPointerUnchecked(Quantum.Core.FrameBase,Quantum.EcsAccess)"/> for a component known to be present, with table state pre-resolved.
+            </summary>
+        </member>
+        <member name="M:Quantum.Core.ComponentRef.GetPointerFromCurrentLocationUnchecked(Quantum.EcsAccess)">
+            <summary>
+            Returns the current pointer. (Triggers copy-on-write if necessary.)
+            </summary>
         </member>
         <member name="T:Quantum.Core.FrameContext">
             <summary>
@@ -7219,6 +7573,14 @@
             </summary>
             <returns><see langword="true"/> if the instances are not equal.</returns>
         </member>
+        <member name="T:Quantum.Collections.UnsafeFixedArray`1">
+            <summary>
+            An index-addressable container of <typeparamref name="T"/> values held in fixed-size blocks.
+            Element pointers stay valid for the lifetime of the block they live in, so the container can
+            grow without invalidating them.
+            </summary>
+            <typeparam name="T">Element type, which must be unmanaged.</typeparam>
+        </member>
         <member name="T:Quantum.Collections.UnsafeFixedList`1">
             <summary>
             A stable container for elements in unmanaged memory.
@@ -7245,24 +7607,24 @@
         </member>
         <member name="T:Quantum.BitSetRef">
             <summary>
-            A variable sized bitmask.
+            A variable sized bitmask over 64-bit words.
             </summary>
         </member>
         <member name="F:Quantum.BitSetRef.Bits">
             <summary>
-            The unsinged long array that holds the bits.
+            The words that hold the bits.
             </summary>
         </member>
         <member name="F:Quantum.BitSetRef.BitsSize">
             <summary>
-            The number of bit that the bitmask can hold.
+            The number of bits that the bitmask can hold.
             </summary>
         </member>
         <member name="M:Quantum.BitSetRef.#ctor(System.UInt64*,System.Int32)">
             <summary>
             Create a bitmask with the given bits and size.
             </summary>
-            <param name="bits">The ulong array to save the bit information</param>
+            <param name="bits">The words that hold the bit information</param>
             <param name="bitsSize">The maximum bit index of the bitmask</param>
         </member>
         <member name="P:Quantum.BitSetRef.Length">
@@ -7293,6 +7655,87 @@
             </summary>
             <param name="bit">Bit to check, must be less than <see cref="P:Quantum.BitSetRef.Length"/></param>
             <returns></returns>
+        </member>
+        <member name="M:Quantum.BitSetRef.GetEnumerator">
+            <summary>
+            Returns an iterator that efficiently iterates the 1 bits in the set.
+            </summary>
+        </member>
+        <member name="P:Quantum.BitSetRef.Ones">
+            <summary>
+            Returns an iterator that efficiently iterates the 1 bits in the set.
+            </summary>
+        </member>
+        <member name="P:Quantum.BitSetRef.Zeros">
+            <summary>
+            Returns an iterator that efficiently iterates the 0 bits in the set.
+            </summary>
+        </member>
+        <member name="T:Quantum.BitSetRef32">
+            <summary>
+            A variable sized bitmask over 32-bit words.
+            </summary>
+        </member>
+        <member name="F:Quantum.BitSetRef32.Bits">
+            <summary>
+            The words that hold the bits.
+            </summary>
+        </member>
+        <member name="F:Quantum.BitSetRef32.BitsSize">
+            <summary>
+            The number of bits that the bitmask can hold.
+            </summary>
+        </member>
+        <member name="M:Quantum.BitSetRef32.#ctor(System.UInt32*,System.Int32)">
+            <summary>
+            Create a bitmask with the given bits and size.
+            </summary>
+            <param name="bits">The words that hold the bit information</param>
+            <param name="bitsSize">The maximum bit index of the bitmask</param>
+        </member>
+        <member name="P:Quantum.BitSetRef32.Length">
+            <summary>
+            Returns the size of the bitmask
+            </summary>
+        </member>
+        <member name="M:Quantum.BitSetRef32.Set(System.Int32)">
+            <summary>
+            Set a bit in the bitmask.
+            </summary>
+            <param name="bit">Bit index, must be less than <see cref="P:Quantum.BitSetRef32.Length"/></param>
+        </member>
+        <member name="M:Quantum.BitSetRef32.Clear(System.Int32)">
+            <summary>
+            Remove the bit from the bitmask.
+            </summary>
+            <param name="bit">Bit to remove, must be less than <see cref="P:Quantum.BitSetRef32.Length"/></param>
+        </member>
+        <member name="M:Quantum.BitSetRef32.ClearAll">
+            <summary>
+            Clear all bits in the bitmask.
+            </summary>
+        </member>
+        <member name="M:Quantum.BitSetRef32.IsSet(System.Int32)">
+            <summary>
+            Check if a bit is set in the bitmask.
+            </summary>
+            <param name="bit">Bit to check, must be less than <see cref="P:Quantum.BitSetRef32.Length"/></param>
+            <returns></returns>
+        </member>
+        <member name="M:Quantum.BitSetRef32.GetEnumerator">
+            <summary>
+            Returns an iterator that efficiently iterates the 1 bits in the set.
+            </summary>
+        </member>
+        <member name="P:Quantum.BitSetRef32.Ones">
+            <summary>
+            Returns an iterator that efficiently iterates the 1 bits in the set.
+            </summary>
+        </member>
+        <member name="P:Quantum.BitSetRef32.Zeros">
+            <summary>
+            Returns an iterator that efficiently iterates the 0 bits in the set.
+            </summary>
         </member>
         <member name="T:Quantum.BitSet1024">
             <summary>
@@ -7407,6 +7850,11 @@
             Flags for each component type. Index 0 is reserved for null.
             </summary>
         </member>
+        <member name="F:Quantum.ComponentTypeId.ForceSparseSetStorage">
+            <summary>
+            When set, every component is stored in a sparse set and <see cref="F:Quantum.ComponentFlags.Table"/> is ignored.
+            </summary>
+        </member>
         <member name="F:Quantum.ComponentTypeId.Callbacks">
             <summary>
             Callbacks for each component type. Index 0 is reserved for null.
@@ -7481,6 +7929,13 @@
             Converts the type index to a component type reference. Component type references are persistent and can be used to identify types across different runs and builds.
             </summary>
             <seealso cref="T:Quantum.ComponentTypeRef"/>
+        </member>
+        <member name="M:Quantum.ComponentTypeId.SetForceSparseSetStorage(System.Boolean)">
+            <summary>
+            Turns <see cref="F:Quantum.ComponentTypeId.ForceSparseSetStorage"/> on or off. Turning it on also clears
+            <see cref="F:Quantum.ComponentFlags.Table"/> from every component that is already registered, so
+            components registered before and after the call are both stored in sparse sets.
+            </summary>
         </member>
         <member name="T:Quantum.ComponentTypeId.Builder">
             <summary>
@@ -8829,6 +9284,26 @@
             Table component.
             </summary>
         </member>
+        <member name="M:Quantum.TableBlockIterator.AdvanceBlock(System.Boolean@)">
+            <summary>
+            Advances to the next block and sizes it, leaving the data pointers unresolved.
+            </summary>
+        </member>
+        <member name="M:Quantum.SparseSetBlockIterator.AdvanceBlock">
+            <summary>
+            Advances to the next block and sizes it, leaving the data pointers unresolved.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentBlockIterator.#ctor(Quantum.Core.ComponentDataStore*,Quantum.ComponentDataSparseSet*,System.Int32,Quantum.EcsAccess)">
+            <summary>
+            The store supplies the committed table rows, the sparse set the staged ones.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentBlockIterator.Reset(System.Int32,System.Int32)">
+            <summary>
+            Applies the window to the committed table rows and the staged sparse entries as a single sequence.
+            </summary>
+        </member>
         <member name="T:Quantum.ComponentBlockIterator`1">
             <summary>
             Component block iterators give the fastest possible access via pointers.
@@ -8857,6 +9332,34 @@
             </summary>
             <returns>An Enumerator object that can be used to iterate through the collection.</returns>
         </member>
+        <member name="T:Quantum.ComponentBlockIteratorReadOnly`1">
+            <summary>
+            Read-only component block iterator: unlike <see cref="T:Quantum.ComponentBlockIterator`1"/>, the visited blocks
+            are not copy-on-write copied, at the expense of only allowing read-only access to the components.
+            </summary>
+            <typeparam name="T">Component type to iterate over</typeparam>
+            <remarks>Component values written through other frame APIs during the iteration may not be visible
+            through references obtained from the iterator.</remarks>
+        </member>
+        <member name="M:Quantum.ComponentBlockIteratorReadOnly`1.GetEnumerator">
+            <summary>
+            Returns an enumerator that iterates through a collection of components.
+            </summary>
+            <returns>An Enumerator object that can be used to iterate through the collection.</returns>
+        </member>
+        <member name="T:Quantum.ComponentBlockIteratorReadOnly`1.Enumerator">
+            <summary>
+            ComponentBlockIteratorReadOnly enumerator object.
+            </summary>
+        </member>
+        <member name="P:Quantum.ComponentBlockIteratorReadOnly`1.Enumerator.Current">
+            <summary>
+            Gets the element in the collection at the current position of the enumerator.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentBlockIteratorReadOnly`1.Enumerator.MoveNext">
+            <inheritdoc cref="M:Quantum.ComponentBlockIterator`1.Enumerator.MoveNext"/>
+        </member>
         <member name="T:Quantum.ComponentFilter`1">
             <summary>
             Filter entities by component types.
@@ -8877,7 +9380,7 @@
         </member>
         <member name="M:Quantum.ComponentFilter`1.NextUnsafe(Quantum.EntityRef@,`0*@)">
             <summary>
-            Advances the filter to the next element of the collection. Grants unsafe access to the component data.
+            Advances the filter to the next element of the collection, returning unsafe pointers to the component data.
             </summary>
             <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
             <param name="entity">The entity ref</param>
@@ -8904,7 +9407,7 @@
         </member>
         <member name="M:Quantum.ComponentFilter`2.NextUnsafe(Quantum.EntityRef@,`0*@,`1*@)">
             <summary>
-            Advances the filter to the next element of the collection. Grants unsafe access to the component data.
+            Advances the filter to the next element of the collection, returning unsafe pointers to the component data.
             </summary>
             <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
             <param name="entity">The entity ref</param>
@@ -8933,7 +9436,7 @@
         </member>
         <member name="M:Quantum.ComponentFilter`3.NextUnsafe(Quantum.EntityRef@,`0*@,`1*@,`2*@)">
             <summary>
-            Advances the filter to the next element of the collection. Grants unsafe access to the component data.
+            Advances the filter to the next element of the collection, returning unsafe pointers to the component data.
             </summary>
             <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
             <param name="entity">The entity ref</param>
@@ -8964,7 +9467,7 @@
         </member>
         <member name="M:Quantum.ComponentFilter`4.NextUnsafe(Quantum.EntityRef@,`0*@,`1*@,`2*@,`3*@)">
             <summary>
-            Advances the filter to the next element of the collection. Grants unsafe access to the component data.
+            Advances the filter to the next element of the collection, returning unsafe pointers to the component data.
             </summary>
             <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
             <param name="entity">The entity ref</param>
@@ -8997,7 +9500,7 @@
         </member>
         <member name="M:Quantum.ComponentFilter`5.NextUnsafe(Quantum.EntityRef@,`0*@,`1*@,`2*@,`3*@,`4*@)">
             <summary>
-            Advances the filter to the next element of the collection. Grants unsafe access to the component data.
+            Advances the filter to the next element of the collection, returning unsafe pointers to the component data.
             </summary>
             <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
             <param name="entity">The entity ref</param>
@@ -9032,7 +9535,7 @@
         </member>
         <member name="M:Quantum.ComponentFilter`6.NextUnsafe(Quantum.EntityRef@,`0*@,`1*@,`2*@,`3*@,`4*@,`5*@)">
             <summary>
-            Advances the filter to the next element of the collection. Grants unsafe access to the component data.
+            Advances the filter to the next element of the collection, returning unsafe pointers to the component data.
             </summary>
             <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
             <param name="entity">The entity ref</param>
@@ -9069,7 +9572,7 @@
         </member>
         <member name="M:Quantum.ComponentFilter`7.NextUnsafe(Quantum.EntityRef@,`0*@,`1*@,`2*@,`3*@,`4*@,`5*@,`6*@)">
             <summary>
-            Advances the filter to the next element of the collection. Grants unsafe access to the component data.
+            Advances the filter to the next element of the collection, returning unsafe pointers to the component data.
             </summary>
             <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
             <param name="entity">The entity ref</param>
@@ -9108,7 +9611,7 @@
         </member>
         <member name="M:Quantum.ComponentFilter`8.NextUnsafe(Quantum.EntityRef@,`0*@,`1*@,`2*@,`3*@,`4*@,`5*@,`6*@,`7*@)">
             <summary>
-            Advances the filter to the next element of the collection. Grants unsafe access to the component data.
+            Advances the filter to the next element of the collection, returning unsafe pointers to the component data.
             </summary>
             <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
             <param name="entity">The entity ref</param>
@@ -9120,6 +9623,178 @@
             <param name="component5">The unsafe component pointer</param>
             <param name="component6">The unsafe component pointer</param>
             <param name="component7">The unsafe component pointer</param>
+        </member>
+        <member name="T:Quantum.ComponentFilterRef`1">
+            <summary>
+            Filter entities by component types and specifies how those components are accessed.
+            </summary>
+        </member>
+        <member name="P:Quantum.ComponentFilterRef`1.UseCulling">
+            <summary>
+            Include culled entities in the filter.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentFilterRef`1.Next(Quantum.EntityRef@,`0@)">
+            <summary>
+            Advances the filter to the next element of the collection, returning references to the component data.
+            </summary>
+            <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
+            <param name="entity">The entity ref</param>
+            <param name="component0">The component ref</param>
+        </member>
+        <member name="T:Quantum.ComponentFilterRef`2">
+            <summary>
+            Filter entities by component types and specifies how those components are accessed.
+            </summary>
+        </member>
+        <member name="P:Quantum.ComponentFilterRef`2.UseCulling">
+            <summary>
+            Include culled entities in the filter.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentFilterRef`2.Next(Quantum.EntityRef@,`0@,`1@)">
+            <summary>
+            Advances the filter to the next element of the collection, returning references to the component data.
+            </summary>
+            <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
+            <param name="entity">The entity ref</param>
+            <param name="component0">The component ref</param>
+            <param name="component1">The component ref</param>
+        </member>
+        <member name="T:Quantum.ComponentFilterRef`3">
+            <summary>
+            Filter entities by component types and specifies how those components are accessed.
+            </summary>
+        </member>
+        <member name="P:Quantum.ComponentFilterRef`3.UseCulling">
+            <summary>
+            Include culled entities in the filter.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentFilterRef`3.Next(Quantum.EntityRef@,`0@,`1@,`2@)">
+            <summary>
+            Advances the filter to the next element of the collection, returning references to the component data.
+            </summary>
+            <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
+            <param name="entity">The entity ref</param>
+            <param name="component0">The component ref</param>
+            <param name="component1">The component ref</param>
+            <param name="component2">The component ref</param>
+        </member>
+        <member name="T:Quantum.ComponentFilterRef`4">
+            <summary>
+            Filter entities by component types and specifies how those components are accessed.
+            </summary>
+        </member>
+        <member name="P:Quantum.ComponentFilterRef`4.UseCulling">
+            <summary>
+            Include culled entities in the filter.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentFilterRef`4.Next(Quantum.EntityRef@,`0@,`1@,`2@,`3@)">
+            <summary>
+            Advances the filter to the next element of the collection, returning references to the component data.
+            </summary>
+            <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
+            <param name="entity">The entity ref</param>
+            <param name="component0">The component ref</param>
+            <param name="component1">The component ref</param>
+            <param name="component2">The component ref</param>
+            <param name="component3">The component ref</param>
+        </member>
+        <member name="T:Quantum.ComponentFilterRef`5">
+            <summary>
+            Filter entities by component types and specifies how those components are accessed.
+            </summary>
+        </member>
+        <member name="P:Quantum.ComponentFilterRef`5.UseCulling">
+            <summary>
+            Include culled entities in the filter.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentFilterRef`5.Next(Quantum.EntityRef@,`0@,`1@,`2@,`3@,`4@)">
+            <summary>
+            Advances the filter to the next element of the collection, returning references to the component data.
+            </summary>
+            <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
+            <param name="entity">The entity ref</param>
+            <param name="component0">The component ref</param>
+            <param name="component1">The component ref</param>
+            <param name="component2">The component ref</param>
+            <param name="component3">The component ref</param>
+            <param name="component4">The component ref</param>
+        </member>
+        <member name="T:Quantum.ComponentFilterRef`6">
+            <summary>
+            Filter entities by component types and specifies how those components are accessed.
+            </summary>
+        </member>
+        <member name="P:Quantum.ComponentFilterRef`6.UseCulling">
+            <summary>
+            Include culled entities in the filter.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentFilterRef`6.Next(Quantum.EntityRef@,`0@,`1@,`2@,`3@,`4@,`5@)">
+            <summary>
+            Advances the filter to the next element of the collection, returning references to the component data.
+            </summary>
+            <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
+            <param name="entity">The entity ref</param>
+            <param name="component0">The component ref</param>
+            <param name="component1">The component ref</param>
+            <param name="component2">The component ref</param>
+            <param name="component3">The component ref</param>
+            <param name="component4">The component ref</param>
+            <param name="component5">The component ref</param>
+        </member>
+        <member name="T:Quantum.ComponentFilterRef`7">
+            <summary>
+            Filter entities by component types and specifies how those components are accessed.
+            </summary>
+        </member>
+        <member name="P:Quantum.ComponentFilterRef`7.UseCulling">
+            <summary>
+            Include culled entities in the filter.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentFilterRef`7.Next(Quantum.EntityRef@,`0@,`1@,`2@,`3@,`4@,`5@,`6@)">
+            <summary>
+            Advances the filter to the next element of the collection, returning references to the component data.
+            </summary>
+            <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
+            <param name="entity">The entity ref</param>
+            <param name="component0">The component ref</param>
+            <param name="component1">The component ref</param>
+            <param name="component2">The component ref</param>
+            <param name="component3">The component ref</param>
+            <param name="component4">The component ref</param>
+            <param name="component5">The component ref</param>
+            <param name="component6">The component ref</param>
+        </member>
+        <member name="T:Quantum.ComponentFilterRef`8">
+            <summary>
+            Filter entities by component types and specifies how those components are accessed.
+            </summary>
+        </member>
+        <member name="P:Quantum.ComponentFilterRef`8.UseCulling">
+            <summary>
+            Include culled entities in the filter.
+            </summary>
+        </member>
+        <member name="M:Quantum.ComponentFilterRef`8.Next(Quantum.EntityRef@,`0@,`1@,`2@,`3@,`4@,`5@,`6@,`7@)">
+            <summary>
+            Advances the filter to the next element of the collection, returning references to the component data.
+            </summary>
+            <returns><see langword="true"/> if the filter was successfully advanced to the next element; <see langword="false"/> if the filter has passed the end of the collection.</returns>   
+            <param name="entity">The entity ref</param>
+            <param name="component0">The component ref</param>
+            <param name="component1">The component ref</param>
+            <param name="component2">The component ref</param>
+            <param name="component3">The component ref</param>
+            <param name="component4">The component ref</param>
+            <param name="component5">The component ref</param>
+            <param name="component6">The component ref</param>
+            <param name="component7">The component ref</param>
         </member>
         <member name="T:Quantum.ComponentFilterStructMeta">
             <summary>
@@ -9161,12 +9836,17 @@
             The component index for all types.
             </summary>
         </member>
+        <member name="F:Quantum.ComponentFilterStructMeta.ComponentReadWriteMask">
+            <summary>
+            The kind of access for all components.
+            </summary>
+        </member>
         <member name="M:Quantum.ComponentFilterStructMeta.Create``1">
             <summary>
             Create a new component filter meta from a filter type.
             </summary>
             <typeparam name="T">Filter type</typeparam>
-            <returns>C</returns>
+            <returns>Filter metadata</returns>
             <exception cref="T:System.InvalidOperationException"></exception>
         </member>
         <member name="T:Quantum.ComponentFilterStruct`1">
@@ -9291,6 +9971,97 @@
             <param name="prototypeRef">The <see cref="P:Quantum.ComponentPrototypeRef.EntityPrototypeRef"/> to create the <see cref="T:Quantum.ComponentPrototypeRef"/> from.</param>
             <param name="type">The <see cref="T:System.Type"/> of the component.</param>
             <returns>A new <see cref="T:Quantum.ComponentPrototypeRef"/> instance.</returns>
+        </member>
+        <member name="T:Quantum.IComponentRef">
+            <summary>
+            An interface implemented by <see cref="T:Quantum.Ref`1"/> and <see cref="T:Quantum.ReadOnlyRef`1"/>. Must not be implemented by user types.
+            </summary>
+        </member>
+        <member name="T:Quantum.ReadOnlyRef`1">
+            <summary>
+            A pointer to a read-only component value.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <remarks>
+            This pointer can be invalidated when frame commands are committed, so it isn't safe to cache.
+            When using copy-on-write, this pointer might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="P:Quantum.ReadOnlyRef`1.Value">
+            <summary>
+            A read-only reference to the pointed-at component value. 
+            </summary>
+        </member>
+        <member name="P:Quantum.ReadOnlyRef`1.IsNull">
+            <summary>
+            <see langword="true"/> if this reference does not point at a component value, in which case <see cref="P:Quantum.ReadOnlyRef`1.Value"/> must not be used.
+            </summary>
+        </member>
+        <member name="M:Quantum.ReadOnlyRef`1.AsUntyped">
+            <summary>
+            Returns an untyped <see cref="T:Quantum.ReadOnlyRef"/>.
+            </summary>
+        </member>
+        <member name="T:Quantum.Ref`1">
+            <summary>
+            A pointer to a writeable component value.
+            </summary>
+            <typeparam name="T"></typeparam>
+            <remarks>
+            This pointer can be invalidated when frame commands are committed, so it isn't safe to cache.
+            </remarks>
+        </member>
+        <member name="P:Quantum.Ref`1.Value">
+            <summary>
+            A reference to the pointed-at component value. 
+            </summary>
+        </member>
+        <member name="M:Quantum.Ref`1.AsUntyped">
+            <summary>
+            Returns an untyped <see cref="T:Quantum.Ref"/>.
+            </summary>
+        </member>
+        <member name="T:Quantum.ReadOnlyRef">
+            <summary>
+            A pointer to a read-only component value with unknown type.
+            </summary>
+            <remarks>
+            This pointer can be invalidated when frame commands are committed, so it isn't safe to cache.
+            When using copy-on-write, this pointer might not observe writes made elsewhere.
+            </remarks>
+        </member>
+        <member name="M:Quantum.ReadOnlyRef.Value``1">
+            <summary>
+            Casts the underlying pointer to <c>T*</c> and returns a reference to the pointed-at component value. 
+            </summary>
+        </member>
+        <member name="P:Quantum.ReadOnlyRef.IsNull">
+            <summary>
+            <see langword="true"/> if this reference does not point at a component value, in which case <see cref="M:Quantum.ReadOnlyRef.Value``1"/> must not be used.
+            </summary>
+        </member>
+        <member name="M:Quantum.ReadOnlyRef.AsTyped``1">
+            <summary>
+            Casts the underlying pointer to <c>T*</c> and returns a typed <see cref="T:Quantum.ReadOnlyRef`1"/>.
+            </summary>
+        </member>
+        <member name="T:Quantum.Ref">
+            <summary>
+            A pointer to a writeable component value with unknown type.
+            </summary>
+            <remarks>
+            This pointer can be invalidated when frame commands are committed, so it isn't safe to cache.
+            </remarks>
+        </member>
+        <member name="M:Quantum.Ref.Value``1">
+            <summary>
+            Casts the underlying pointer to <c>T*</c> and returns a reference to the pointed-at component value. 
+            </summary>
+        </member>
+        <member name="M:Quantum.Ref.AsTyped``1">
+            <summary>
+            Casts the underlying pointer to <c>T*</c> and returns a typed <see cref="T:Quantum.Ref`1"/>.
+            </summary>
         </member>
         <member name="T:Quantum.ComponentRegistry">
             <summary>
@@ -10082,6 +10853,25 @@
         <member name="M:Quantum.EntityComponentPair`1.Deconstruct(Quantum.EntityRef@,`0@)">
             <inheritdoc cref="M:Quantum.CodeDocHelper.Deconstruct(System.Int32@)"/>
         </member>
+        <member name="T:Quantum.EntityComponentReadOnlyPair`1">
+            <summary>
+            An entity-component read-only reference pair. Used when iterating over components with read-only access.
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="F:Quantum.EntityComponentReadOnlyPair`1.Entity">
+            <summary>
+            The entity the component belongs to.
+            </summary>
+        </member>
+        <member name="F:Quantum.EntityComponentReadOnlyPair`1.Component">
+            <summary>
+            Read-only reference to the component.
+            </summary>
+        </member>
+        <member name="M:Quantum.EntityComponentReadOnlyPair`1.Deconstruct(Quantum.EntityRef@,Quantum.ReadOnlyRef{`0}@)">
+            <inheritdoc cref="M:Quantum.CodeDocHelper.Deconstruct(System.Int32@)"/>
+        </member>
         <member name="T:Quantum.EntityComponentPointerPair`1">
             <summary>
             An entity-component pointer pair. Used when iterating over components.
@@ -10694,31 +11484,63 @@
             <inheritdoc cref="M:Quantum.Core.FrameBase.TryFindAsset``1(System.String,``0@,Quantum.DatabaseType)"/>
         </member>
         <member name="M:Quantum.FrameThreadSafe.TryGetPointer``1(Quantum.EntityRef,``0*@)">
-            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetPointer``1(Quantum.EntityRef,``0*@)"/>
+            <inheritdoc cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.TryGetPointer``1(Quantum.EntityRef,``0*@)"/>
         </member>
         <member name="M:Quantum.FrameThreadSafe.TryGetPointer(Quantum.EntityRef,System.Int32,System.Void*@)">
-            <summary>
-            Tries to get a pointer to a component of an entity in the frame.
-            </summary>
-            <param name="entityRef">The entity reference.</param>
-            <param name="componentIndex">The index of the component.</param>
-            <param name="value">The output parameter to store the pointer.</param>
-            <returns><see langword="true"/> if the pointer was successfully retrieved; otherwise, <see langword="false"/>.</returns>
+            <inheritdoc cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.TryGetPointer(Quantum.EntityRef,System.Int32,System.Void*@)"/>
         </member>
         <member name="M:Quantum.FrameThreadSafe.GetPointer``1(Quantum.EntityRef)">
-            <inheritdoc cref="M:Quantum.Core.FrameBase.GetPointer``1(Quantum.EntityRef)"/>
+            <inheritdoc cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetPointer``1(Quantum.EntityRef)"/>
         </member>
         <member name="M:Quantum.FrameThreadSafe.GetPointer(Quantum.EntityRef,System.Int32)">
-            <inheritdoc cref="M:Quantum.Core.FrameBase.GetPointer(Quantum.EntityRef,System.Int32)"/>
+            <inheritdoc cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetPointer(Quantum.EntityRef,System.Int32)"/>
+        </member>
+        <member name="M:Quantum.FrameThreadSafe.GetReadOnlyRef``1(Quantum.EntityRef)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetReadOnlyRef``1(Quantum.EntityRef,Quantum.ReadOnlyRef{``0}@)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.FrameThreadSafe.GetReadOnlyRef(Quantum.EntityRef,System.Int32)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetReadOnlyRef(Quantum.EntityRef,System.Int32,Quantum.ReadOnlyRef@)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.FrameThreadSafe.TryGetReadOnlyRef``1(Quantum.EntityRef,Quantum.ReadOnlyRef{``0}@)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetReadOnlyRef``1(Quantum.EntityRef,Quantum.ReadOnlyRef{``0}@)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.FrameThreadSafe.TryGetReadOnlyRef(Quantum.EntityRef,System.Int32,Quantum.ReadOnlyRef@)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetReadOnlyRef(Quantum.EntityRef,System.Int32,Quantum.ReadOnlyRef@)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.FrameThreadSafe.GetRef``1(Quantum.EntityRef)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.GetRef``1(Quantum.EntityRef)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.FrameThreadSafe.GetRef(Quantum.EntityRef,System.Int32)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.GetRef(Quantum.EntityRef,System.Int32)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.FrameThreadSafe.TryGetRef``1(Quantum.EntityRef,Quantum.Ref{``0}@)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetRef``1(Quantum.EntityRef,Quantum.Ref{``0}@)"/>
+            \ingroup EntityApi
+        </member>
+        <member name="M:Quantum.FrameThreadSafe.TryGetRef(Quantum.EntityRef,System.Int32,Quantum.Ref@)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.TryGetRef(Quantum.EntityRef,System.Int32,Quantum.Ref@)"/>
+            \ingroup EntityApi
         </member>
         <member name="M:Quantum.FrameThreadSafe.GetComponentIterator``1">
             <inheritdoc cref="M:Quantum.Core.FrameBase.GetComponentIterator``1"/>
         </member>
         <member name="M:Quantum.FrameThreadSafe.GetComponentBlockIterator``1">
-            <inheritdoc cref="M:Quantum.Core.FrameBase.GetComponentBlockIterator``1"/>
+            <inheritdoc cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetComponentBlockIterator``1"/>
         </member>
         <member name="M:Quantum.FrameThreadSafe.GetComponentBlockIterator``1(System.Int32,System.Int32)">
-            <inheritdoc cref="M:Quantum.Core.FrameBase.GetComponentBlockIterator``1(System.Int32,System.Int32)"/>
+            <inheritdoc cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetComponentBlockIterator``1(System.Int32,System.Int32)"/>
+        </member>
+        <member name="M:Quantum.FrameThreadSafe.GetComponentBlockIteratorReadOnly``1">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetComponentBlockIteratorReadOnly``1"/>
+        </member>
+        <member name="M:Quantum.FrameThreadSafe.GetComponentBlockIteratorReadOnly``1(System.Int32,System.Int32)">
+            <inheritdoc cref="M:Quantum.Core.FrameBase.FrameBaseUnsafe.GetComponentBlockIteratorReadOnly``1(System.Int32,System.Int32)"/>
         </member>
         <member name="M:Quantum.FrameThreadSafe.GetComponentSet(Quantum.EntityRef)">
             <inheritdoc cref="M:Quantum.Core.FrameBase.GetComponentSet(Quantum.EntityRef)"/>
@@ -13001,6 +13823,11 @@
             The asset dispose callback to release memory.
             </summary>
         </member>
+        <member name="M:Quantum.MapStaticCollider2DPolygonData.Clone">
+            <summary>
+            Creates a copy that owns its data. <see cref="F:Quantum.MapStaticCollider2DPolygonData.RuntimeData"/> is not copied.
+            </summary>
+        </member>
         <member name="T:Quantum.QNavMeshStaticColliderData">
             <summary>
             Saves an area and flags that can be used to generate a navmesh from the Quantum map static colliders.
@@ -13706,6 +14533,12 @@
             </summary>
             <remarks>Use see <see cref="M:Quantum.NavMeshPathfinder.SetConfig(Quantum.Core.FrameBase,Quantum.EntityRef,Quantum.NavMeshAgentConfig,System.Boolean)"/> to change config during runtime.</remarks>
         </member>
+        <member name="P:Quantum.NavMeshPathfinder.Config">
+            <summary>
+            Agent config asset.
+            </summary>
+            <remarks>Use see <see cref="M:Quantum.NavMeshPathfinder.SetConfig(Quantum.Core.FrameBase,Quantum.EntityRef,Quantum.NavMeshAgentConfig,System.Boolean)"/> to change config during runtime.</remarks>
+        </member>
         <member name="P:Quantum.NavMeshPathfinder.InternalTarget">
             <summary>
             Target position is potentially corrected and moved inside the navmesh (read only).
@@ -13720,6 +14553,11 @@
         <member name="P:Quantum.NavMeshPathfinder.NavMeshGuid">
             <summary>
             Current assigned navmesh.
+            </summary>
+        </member>
+        <member name="P:Quantum.NavMeshPathfinder.NavMesh">
+            <summary>
+            Current assigned navmesh.B
             </summary>
         </member>
         <member name="P:Quantum.NavMeshPathfinder.Target">
@@ -14252,6 +15090,19 @@
             Reset all static fields to their default values.
             </summary>
         </member>
+        <member name="M:Quantum.Navigation.Updater.InvalidateAgentEntry(Quantum.EntityRef)">
+            <summary>
+            Invalidates the entity's agent entry when its <see cref="T:Quantum.NavMeshPathfinder"/> is removed (also on
+            entity destruction): a user callback can destroy *another* entity, whose entry would otherwise
+            keep pointing at the swap-reused table row.
+            </summary>
+        </member>
+        <member name="M:Quantum.Navigation.Updater.InvalidateObstacleEntry(Quantum.EntityRef)">
+            <summary>
+            Invalidates the entity's obstacle entry when its <see cref="T:Quantum.NavMeshAvoidanceObstacle"/> is
+            removed. See <see cref="M:Quantum.Navigation.Updater.InvalidateAgentEntry(Quantum.EntityRef)"/>.
+            </summary>
+        </member>
         <member name="T:Quantum.Navigation.IPathFinderData">
             <summary>
             An interface to access a few selected internal pathfinding data.
@@ -14525,6 +15376,59 @@
         <member name="F:Quantum.Navigation.Config.VelocityObstacleTruncationFactor">
             <summary>
              The default factor non-moving velocity obstacles are truncated with.
+            </summary>
+        </member>
+        <member name="T:Quantum.Navigation.EntryComponentRefs">
+            <summary>
+            ComponentRefs for Agent and Obstacle entries.
+            Kept out of <see cref="T:Quantum.Navigation.Entry"/> to not bloat its size and reduce cache coherence.
+            </summary>
+        </member>
+        <member name="T:Quantum.Navigation.Entry.BorrowedPointers">
+            <summary>
+            Cached pointers copy-on-write can still move
+            </summary>
+        </member>
+        <member name="M:Quantum.Navigation.Entry.InvalidateCachedPointers">
+            <summary>
+            Invalidates all refs and nulls all cached pointers; nulled pointers make the task loops skip the entry.
+            </summary>
+        </member>
+        <member name="M:Quantum.Navigation.Entry.EnsureValidPathfinderAgent(Quantum.Core.FrameBase)">
+            <summary>
+            Returns true if the entity still exists with its <see cref="T:Quantum.NavMeshPathfinder"/> and the cached
+            <see cref="F:Quantum.Navigation.Entry.PathfinderAgent"/> pointer is non-null; otherwise invalidates the cached pointers and returns false.
+            </summary>
+        </member>
+        <member name="M:Quantum.Navigation.Entry.RevalidateCachedPointers">
+            <summary>
+            Updates cached borrowed pointers after copy-on-write promotions. Table moves cannot happen here:
+            commands stay blocked for the whole navigation task graph, so no row moves while entries are live.
+            Only still-borrowed refs are re-resolved. Main thread only — the threaded pair task shares entries.
+            </summary>
+        </member>
+        <member name="M:Quantum.Navigation.Entry.AssertHasNoBorrowedPointers">
+            <summary>
+            Asserts all component refs are settled (no borrowed pointers).
+            </summary>
+        </member>
+        <member name="T:Quantum.Navigation.Entry.TableBlockRef">
+            <summary>
+            Resolves component refs and cached pointers per table block for Task 01: column indices once per
+            table and block-column state once per block, instead of a dictionary lookup per component per entity.
+            </summary>
+        </member>
+        <member name="M:Quantum.Navigation.Entry.TableBlockRef.InitAgentEntryComponentRefsAndPointers(Quantum.Navigation.Entry*)">
+            <summary>
+            Initializes the component refs and cached pointers of an agent entry. All components get owned
+            access: active agents are moved nearly every tick (by engine or user code), so copy up-front.
+            Gating it per entity would not pay off, since owning is per column per block.
+            </summary>
+        </member>
+        <member name="M:Quantum.Navigation.Entry.TableBlockRef.InitObstacleEntryComponentRefsAndPointers(Quantum.Navigation.Entry*)">
+            <summary>
+            Initializes the component refs and cached pointers of an obstacle entry. Obstacle entries are
+            never written through entry pointers, so everything gets read access.
             </summary>
         </member>
         <member name="T:Quantum.Navigation.ThreadLocal">
@@ -15464,6 +16368,7 @@
             </summary>
             <param name="defaultCapacity">The initial <see cref="T:Quantum.Physics2D.Hit"/> buffer capacity allocated for the hit collection.</param>
             <returns>A pointer to the allocated hit collection.</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when <paramref name="defaultCapacity"/> is not greater than zero.</exception>
             \ingroup Physics2dApi
         </member>
         <member name="M:Quantum.Physics2D.PhysicsEngine2D.Api.FreePersistentHitCollection(Quantum.Physics2D.HitCollection*)">
@@ -16669,6 +17574,9 @@
             </param>
             <exception cref="T:System.NullReferenceException">If the <paramref name="jointBody"/> is null.</exception>
         </member>
+        <member name="M:Quantum.Physics2D.SpringJoint.GetStiffness(Quantum.ReadOnlyRef{Quantum.PhysicsBody2D},Quantum.ReadOnlyRef{Quantum.PhysicsBody2D},Photon.Deterministic.FP@,Photon.Deterministic.FP@)">
+            <inheritdoc cref="M:Quantum.Physics2D.SpringJoint.GetStiffness(Quantum.PhysicsBody2D*,Quantum.PhysicsBody2D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)"/>
+        </member>
         <member name="M:Quantum.Physics2D.SpringJoint.SetStiffness(Photon.Deterministic.FP,Photon.Deterministic.FP,Quantum.PhysicsBody2D*,Quantum.PhysicsBody2D*)">
             <summary>
             Computes and sets the <see cref="F:Quantum.Physics2D.SpringJoint.Spring"/> and <see cref="F:Quantum.Physics2D.SpringJoint.Damper"/> capacities based on the target <paramref name="frequency"/> and <paramref name="dampingRatio"/>, given the physics body(ies) involved.
@@ -16676,12 +17584,18 @@
             <inheritdoc cref="M:Quantum.Physics2D.SpringJoint.GetStiffness(Quantum.PhysicsBody2D*,Quantum.PhysicsBody2D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)"/>
             @copydetails GetStiffness
         </member>
+        <member name="M:Quantum.Physics2D.SpringJoint.SetStiffness(Photon.Deterministic.FP,Photon.Deterministic.FP,Quantum.ReadOnlyRef{Quantum.PhysicsBody2D},Quantum.ReadOnlyRef{Quantum.PhysicsBody2D})">
+            <inheritdoc cref="M:Quantum.Physics2D.SpringJoint.GetStiffness(Quantum.PhysicsBody2D*,Quantum.PhysicsBody2D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)"/>
+        </member>
         <member name="M:Quantum.Physics2D.SpringJoint.ComputeStiffness(Photon.Deterministic.FP,Photon.Deterministic.FP,Quantum.PhysicsBody2D*,Quantum.PhysicsBody2D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)">
             <summary>
             Computes the <paramref name="spring"/> and <paramref name="damper"/> capacities based on the target <paramref name="frequency"/> and <paramref name="dampingRatio"/>, given the physics body(ies) involved.
             </summary>
             <inheritdoc cref="M:Quantum.Physics2D.SpringJoint.GetStiffness(Quantum.PhysicsBody2D*,Quantum.PhysicsBody2D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)"/>
             @copydetails GetStiffness
+        </member>
+        <member name="M:Quantum.Physics2D.SpringJoint.ComputeStiffness(Photon.Deterministic.FP,Photon.Deterministic.FP,Quantum.ReadOnlyRef{Quantum.PhysicsBody2D},Quantum.ReadOnlyRef{Quantum.PhysicsBody2D},Photon.Deterministic.FP@,Photon.Deterministic.FP@)">
+            <inheritdoc cref="M:Quantum.Physics2D.SpringJoint.GetStiffness(Quantum.PhysicsBody2D*,Quantum.PhysicsBody2D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)"/>
         </member>
         <member name="M:Quantum.Physics2D.SpringJoint.Serialize(System.Void*,Quantum.FrameSerializer)">
             <summary>
@@ -16773,6 +17687,17 @@
             <param name="result">The <see cref="T:Quantum.Physics2D.CollisionResultInfo2D"/> reference.</param>
             <param name="hit">The <see cref="T:Quantum.Physics2D.Hit"/> reference.</param>
             <returns>A copy of the hit with the values updated.</returns>
+        </member>
+        <member name="P:Quantum.Physics2D.Scene2D.QueriesAreFrozen">
+            <summary>
+            Broad-phase queries added past this point cannot be resolved this frame.
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics2D.Scene2D.GetCompoundSubEntriesCount(Quantum.Physics2D.Entry2D*)">
+            <summary>
+            The number of sub-entries that follow a compound root on the entries buffer.
+            Nested compounds are flattened, so this can exceed the root compound's shape count.
+            </summary>
         </member>
         <member name="M:Quantum.Physics2D.Scene2D.Task_CreateEntriesMapping(Quantum.FrameThreadSafe,System.Int32,System.Int32,System.Void*)">
             <summary>
@@ -17024,6 +17949,70 @@
             </summary>
             <param name="newCapacity">The amount of new capacity.</param>
             <param name="context">The <see cref="T:Quantum.Core.FrameContext"/>.</param>
+        </member>
+        <member name="T:Quantum.Physics2D.EntryComponentRefs2D">
+            <summary>
+            ComponentRefs for physics 2D entries.
+            Kept out of <see cref="T:Quantum.Physics2D.Entry2D"/> to not bloat its size and reduce cache coherence.
+            <para>
+            Access modes are decided in <see cref="M:Quantum.Physics2D.Entry2D.InitComponentRefsAndPointers(Quantum.Core.FrameBase,Quantum.ComponentSet*)"/>, per entity rather than
+            per field: a ref is read-only unless physics writes that component. Writing through a read-only ref
+            corrupts the verified frame.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Quantum.Physics2D.Entry2D.ComponentRefs">
+            <summary>
+            Assigned when the entry is created; null for static and query entries, which need no component refs.
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics2D.Entry2D.InitComponentRefsAndPointers(Quantum.Core.FrameBase,Quantum.ComponentSet*)">
+            <summary>
+            Initializes all component refs and cached component pointers.
+            - Assumes the entity has a Transform2D and a PhysicsCollider2D.
+            - Invokes copy-on-write (if needed) for components that are guaranteed to be written by physics tasks.
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics2D.Entry2D.CopyComponentRefsAndPointersFrom(Quantum.Physics2D.Entry2D*)">
+            <summary>
+            Copies refs and cached pointers from an entry of the same entity (compound
+            sub-entries). The shape pointer is not copied (sub-entries point at their own sub-shape),
+            nor are the joints ref and pointer (only root entries are joint solver candidates).
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics2D.Entry2D.EnsureOwnedTransformAndBodyPointers(Quantum.Core.FrameBase)">
+            <summary>
+            Ensures the entry's cached transform and body pointers point to writeable memory, triggering
+            copy-on-write if necessary.
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics2D.Entry2D.AssertBulkInitMatchesSingleEntityInit(Quantum.Physics2D.Entry2D*,Quantum.Core.FrameBase,Quantum.ComponentSet*)">
+            <summary>
+            Cross-checks the bulk init in <see cref="M:Quantum.Physics2D.Entry2D.TableBlockRef.InitEntryComponentRefsAndPointers(Quantum.Physics2D.Entry2D*,Quantum.Core.FrameBase)"/> against
+            <see cref="M:Quantum.Physics2D.Entry2D.InitComponentRefsAndPointers(Quantum.Core.FrameBase,Quantum.ComponentSet*)"/>: both express the same rules in different vocabularies and must agree
+            on refs, cached pointers and borrowed flags. Call it once the entry is fully initialized.
+            Driven by DEV tests and not called by the simulation.
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics2D.Entry2D.RevalidateCachedPointers">
+            <summary>
+            Updates cached borrowed pointers to their current locations. (Assumes moves have been resolved, but not copy-on-write.)
+            Only still-borrowed refs are re-resolved.
+            </summary>
+        </member>
+        <member name="T:Quantum.Physics2D.Entry2D.TableBlockRef">
+             <summary>
+             CreateEntities uses a PhysicsCollider2D block iterator to create the entries.
+             Because physics components are table components, this is a *table* block iterator, which we can exploit
+             to init the ComponentRef and cached pointer fields (and trigger copy-on-write) more efficiently.
+            
+             (The overall process works like iterating a component filter that has optional outputs.)
+             </summary>
+        </member>
+        <member name="M:Quantum.Physics2D.Entry2D.TableBlockRef.InitEntryComponentRefsAndPointers(Quantum.Physics2D.Entry2D*,Quantum.Core.FrameBase)">
+            <summary>
+            A variant of <see cref="M:Quantum.Physics2D.Entry2D.InitComponentRefsAndPointers(Quantum.Core.FrameBase,Quantum.ComponentSet*)"/> that is more efficient in bulk.
+            </summary>
         </member>
         <member name="T:Quantum.PolygonColliderRuntimeData">
             <summary>
@@ -17725,6 +18714,11 @@
         <member name="F:Quantum.PhysicsCallbacks2D.Flags">
             <summary>
             Represents which collision callbacks will be called for the entity. See <see cref="T:Quantum.CallbackFlags"/> for more information.
+            </summary>
+        </member>
+        <member name="M:Quantum.PhysicsCallbacks2D.Tracks(Quantum.CallbackFlags)">
+            <summary>
+            Whether the entity subscribed to <paramref name="tracking"/>.
             </summary>
         </member>
         <member name="M:Quantum.PhysicsCallbacks2D.IsCollidingWith(Quantum.Core.FrameBase,Quantum.EntityRef,System.Int32@)">
@@ -18909,8 +19903,8 @@
         </member>
         <member name="F:Quantum.Shape2DConfig.IsScaledBySourceCollider">
             <summary>
-            If the settings baked from a source collider are already scaled by the source GameObject.
-            This can be used to avoid scaling the settings multiple times when the source is a child of the prototype.
+            If the settings are already expressed in final (world) scale and must not be scaled by the prototype transform again.
+            Set when the settings are baked from a source collider.
             </summary>
         </member>
         <member name="M:Quantum.Shape2DConfig.CreateShape(Quantum.Core.FrameBase)">
@@ -19377,6 +20371,7 @@
             </summary>
             <param name="defaultCapacity">The initial <see cref="T:Quantum.Physics3D.Hit3D"/> buffer capacity allocated for the hit collection.</param>
             <returns>A pointer to the allocated hit collection.</returns>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when <paramref name="defaultCapacity"/> is not greater than zero.</exception>
             \ingroup Physics3dApi
         </member>
         <member name="M:Quantum.Physics3D.PhysicsEngine3D.Api.FreePersistentHitCollection3D(Quantum.Physics3D.HitCollection3D*)">
@@ -20695,6 +21690,9 @@
             </param>
             <exception cref="T:System.NullReferenceException">If the <paramref name="jointBody"/> is <see langword="null"/>.</exception>
         </member>
+        <member name="M:Quantum.Physics3D.SpringJoint3D.GetStiffness(Quantum.ReadOnlyRef{Quantum.PhysicsBody3D},Quantum.ReadOnlyRef{Quantum.PhysicsBody3D},Photon.Deterministic.FP@,Photon.Deterministic.FP@)">
+            <inheritdoc cref="M:Quantum.Physics3D.SpringJoint3D.GetStiffness(Quantum.PhysicsBody3D*,Quantum.PhysicsBody3D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)"/>
+        </member>
         <member name="M:Quantum.Physics3D.SpringJoint3D.SetStiffness(Photon.Deterministic.FP,Photon.Deterministic.FP,Quantum.PhysicsBody3D*,Quantum.PhysicsBody3D*)">
             <summary>
             Computes and sets the <see cref="F:Quantum.Physics3D.SpringJoint3D.Spring"/> and <see cref="F:Quantum.Physics3D.SpringJoint3D.Damper"/> capacities based on the target <paramref name="frequency"/> and <paramref name="dampingRatio"/>, given the physics body(ies) involved.
@@ -20702,12 +21700,18 @@
             <inheritdoc cref="M:Quantum.Physics3D.SpringJoint3D.GetStiffness(Quantum.PhysicsBody3D*,Quantum.PhysicsBody3D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)"/>
             @copydetails GetStiffness
         </member>
+        <member name="M:Quantum.Physics3D.SpringJoint3D.SetStiffness(Photon.Deterministic.FP,Photon.Deterministic.FP,Quantum.ReadOnlyRef{Quantum.PhysicsBody3D},Quantum.ReadOnlyRef{Quantum.PhysicsBody3D})">
+            <inheritdoc cref="M:Quantum.Physics3D.SpringJoint3D.GetStiffness(Quantum.PhysicsBody3D*,Quantum.PhysicsBody3D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)"/>
+        </member>
         <member name="M:Quantum.Physics3D.SpringJoint3D.ComputeStiffness(Photon.Deterministic.FP,Photon.Deterministic.FP,Quantum.PhysicsBody3D*,Quantum.PhysicsBody3D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)">
             <summary>
             Computes the <paramref name="spring"/> and <paramref name="damper"/> capacities based on the target <paramref name="frequency"/> and <paramref name="dampingRatio"/>, given the physics body(ies) involved.
             </summary>
             <inheritdoc cref="M:Quantum.Physics3D.SpringJoint3D.GetStiffness(Quantum.PhysicsBody3D*,Quantum.PhysicsBody3D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)"/>
             @copydetails GetStiffness
+        </member>
+        <member name="M:Quantum.Physics3D.SpringJoint3D.ComputeStiffness(Photon.Deterministic.FP,Photon.Deterministic.FP,Quantum.ReadOnlyRef{Quantum.PhysicsBody3D},Quantum.ReadOnlyRef{Quantum.PhysicsBody3D},Photon.Deterministic.FP@,Photon.Deterministic.FP@)">
+            <inheritdoc cref="M:Quantum.Physics3D.SpringJoint3D.GetStiffness(Quantum.PhysicsBody3D*,Quantum.PhysicsBody3D*,Photon.Deterministic.FP@,Photon.Deterministic.FP@)"/>
         </member>
         <member name="M:Quantum.Physics3D.SpringJoint3D.Serialize(System.Void*,Quantum.FrameSerializer)">
             <summary>
@@ -20793,6 +21797,17 @@
             <param name="result">The <see cref="T:Quantum.Physics3D.CollisionResultInfo3D"/> reference.</param>
             <param name="hit">The <see cref="T:Quantum.Physics3D.Hit3D"/> reference.</param>
             <returns>A copy of the hit with the values updated.</returns>
+        </member>
+        <member name="P:Quantum.Physics3D.Scene3D.QueriesAreFrozen">
+            <summary>
+            Broad-phase queries added past this point cannot be resolved this frame.
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics3D.Scene3D.GetCompoundSubEntriesCount(Quantum.Physics3D.Entry3D*)">
+            <summary>
+            The number of sub-entries that follow a compound root on the entries buffer.
+            Nested compounds are flattened, so this can exceed the root compound's shape count.
+            </summary>
         </member>
         <member name="M:Quantum.Physics3D.Scene3D.Task_CreateEntriesMapping(Quantum.FrameThreadSafe,System.Int32,System.Int32,System.Void*)">
             <summary>
@@ -21060,6 +22075,70 @@
             </summary>
             <param name="hit">The Hit3D object to add.</param>
             <param name="context">The FrameContext object.</param>
+        </member>
+        <member name="T:Quantum.Physics3D.EntryComponentRefs3D">
+            <summary>
+            ComponentRefs for physics 3D entries.
+            Kept out of <see cref="T:Quantum.Physics3D.Entry3D"/> to not bloat its size and reduce cache coherence.
+            <para>
+            Access modes are decided in <see cref="M:Quantum.Physics3D.Entry3D.InitComponentRefsAndPointers(Quantum.Core.FrameBase,Quantum.ComponentSet*)"/>, per entity rather than
+            per field: a ref is read-only unless physics writes that component. Writing through a read-only ref
+            corrupts the verified frame.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Quantum.Physics3D.Entry3D.ComponentRefs">
+            <summary>
+            Assigned when the entry is created; null for static and query entries, which need no refs.
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics3D.Entry3D.InitComponentRefsAndPointers(Quantum.Core.FrameBase,Quantum.ComponentSet*)">
+            <summary>
+            Initializes all component refs and cached component pointers.
+            - Assumes the entity has a Transform3D and a PhysicsCollider3D.
+            - Invokes copy-on-write (if needed) for components that are guaranteed to be written by physics tasks.
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics3D.Entry3D.CopyComponentRefsAndPointersFrom(Quantum.Physics3D.Entry3D*)">
+            <summary>
+            Copies refs and cached pointers from an entry of the same entity (compound
+            sub-entries). The shape pointer is not copied (sub-entries point at their own sub-shape),
+            nor are the joints ref and pointer (only root entries are joint solver candidates).
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics3D.Entry3D.EnsureOwnedTransformAndBodyPointers(Quantum.Core.FrameBase)">
+            <summary>
+            Ensures the entry's cached transform and body pointers point to writeable memory, triggering
+            copy-on-write if necessary.
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics3D.Entry3D.RevalidateCachedPointers">
+            <summary>
+            Updates cached borrowed pointers to their current locations. (Assumes moves have been resolved, but not copy-on-write.)
+            Only still-borrowed refs are re-resolved.
+            </summary>
+        </member>
+        <member name="M:Quantum.Physics3D.Entry3D.AssertBulkInitMatchesSingleEntityInit(Quantum.Physics3D.Entry3D*,Quantum.Core.FrameBase,Quantum.ComponentSet*)">
+            <summary>
+            Cross-checks the bulk init in <see cref="M:Quantum.Physics3D.Entry3D.TableBlockRef.InitEntryComponentRefsAndPointers(Quantum.Physics3D.Entry3D*,Quantum.Core.FrameBase)"/> against
+            <see cref="M:Quantum.Physics3D.Entry3D.InitComponentRefsAndPointers(Quantum.Core.FrameBase,Quantum.ComponentSet*)"/>: both express the same rules in different vocabularies and
+            must agree on refs, cached pointers and borrowed flags. Call it once the entry is fully initialized.
+            Driven by DEV tests and not called by the simulation.
+            </summary>
+        </member>
+        <member name="T:Quantum.Physics3D.Entry3D.TableBlockRef">
+             <summary>
+             CreateEntities uses a PhysicsCollider3D block iterator to create the entries.
+             Because physics components are table components, this is a *table* block iterator, which we can exploit
+             to init the ComponentRef and cached pointer fields (and trigger copy-on-write) more efficiently.
+            
+             (The overall process works like iterating a component filter that has optional outputs.)
+             </summary>
+        </member>
+        <member name="M:Quantum.Physics3D.Entry3D.TableBlockRef.InitEntryComponentRefsAndPointers(Quantum.Physics3D.Entry3D*,Quantum.Core.FrameBase)">
+            <summary>
+            A variant of <see cref="M:Quantum.Physics3D.Entry3D.InitComponentRefsAndPointers(Quantum.Core.FrameBase,Quantum.ComponentSet*)"/> that is more efficient in bulk.
+            </summary>
         </member>
         <member name="M:Quantum.Physics3D.FPVector3RawInt.GetHashCode">
             <summary>
@@ -21699,6 +22778,9 @@
             Represents which collision callbacks will be called for the entity. See <see cref="T:Quantum.CallbackFlags"/> for more information.
             </summary>
         </member>
+        <member name="M:Quantum.PhysicsCallbacks3D.Tracks(Quantum.CallbackFlags)">
+            <inheritdoc cref="M:Quantum.PhysicsCallbacks2D.Tracks(Quantum.CallbackFlags)"/>
+        </member>
         <member name="M:Quantum.PhysicsCallbacks3D.IsCollidingWith(Quantum.Core.FrameBase,Quantum.EntityRef,System.Int32@)">
             <inheritdoc cref="M:Quantum.PhysicsCallbacks2D.IsCollidingWith(Quantum.Core.FrameBase,Quantum.EntityRef,System.Int32@)"/>
         </member>
@@ -22283,6 +23365,15 @@
             </summary>
             <param name="triIndex"></param>
             <returns>A pointer to the triangle at the specified index.</returns>
+        </member>
+        <member name="M:Quantum.TriangleMesh.TryGetTriangle(System.Int32,Quantum.TriangleCCW*@)">
+            <summary>
+            Checks the bounds and liveness of <paramref name="triIndex"/> and gets the triangle indexed by it if a
+            valid one is found.
+            </summary>
+            <param name="triIndex">Index of the triangle.</param>
+            <param name="triangle">The triangle, or <see langword="null"/> if the index is not valid.</param>
+            <returns><see langword="true"/> if a live triangle was found.</returns>
         </member>
         <member name="M:Quantum.TriangleMesh.ToCell(Photon.Deterministic.FPVector3,System.Int32@,System.Int32@,System.Int32@)">
             <summary>
@@ -23138,8 +24229,8 @@
         </member>
         <member name="F:Quantum.Shape3DConfig.IsScaledBySourceCollider">
             <summary>
-            If the settings baked from a source collider are already scaled by the source GameObject.
-            This can be used to avoid scaling the settings multiple times when the source is a child of the prototype.
+            If the settings are already expressed in final (world) scale and must not be scaled by the prototype transform again.
+            Set when the settings are baked from a source collider.
             </summary>
         </member>
         <member name="M:Quantum.Shape3DConfig.CreateShape(Quantum.Core.FrameBase)">
@@ -23702,6 +24793,17 @@
         <member name="T:Quantum.PhysicsCommon.PhysicsMatrixImportSource">
             <summary>
             The source of the physics matrix import from Unity.
+            </summary>
+        </member>
+        <member name="T:Quantum.PhysicsCommon.MovedCallbackRegistration">
+            <summary>
+            Register-once guard for a scene's component moved callback.
+            </summary>
+        </member>
+        <member name="M:Quantum.PhysicsCommon.MovedCallbackRegistration.TryRegisterOnce(Quantum.Core.FrameBase)">
+            <summary>
+            Returns <see langword="true"/> the first time it is called for a verified frame, and the first time
+            for a predicted one, meaning the caller still has to register its callback.
             </summary>
         </member>
         <member name="M:Quantum.PhysicsCommon.StaticCollidersState.GetHashCode">
@@ -25959,6 +27061,21 @@
         <member name="M:Quantum.QuantumUnsafe.FreeInternal(System.Void*)">
             <summary>
             Frees a block of memory.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumUnsafe.ShrinkArray``1(``0*,System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Shrinks the allocated memory of the array of the type to a new size by copying the old contents and freeing the old memory.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumUnsafe.ShrinkPtrArray``1(``0**,System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Shrinks the allocated memory of the array of the type to a new size by copying the old contents and freeing the old memory.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumUnsafe.Shrink(System.Void*,System.Int32,System.Int32,System.String,System.Int32)">
+            <summary>
+            Shrinks the allocated memory of the array of the type to a new size by copying the old contents and freeing the old memory.
             </summary>
         </member>
         <member name="T:Quantum.QuantumUnsafeAllocInfo">
@@ -37261,6 +38378,11 @@
             This flag controls if the heap data is dumped when calling <see cref="M:Photon.Deterministic.DeterministicFrame.DumpFrame(System.Int32)"/>.
             </summary>
         </member>
+        <member name="F:Photon.Deterministic.DeterministicFrame.CanAvoidFullCopy">
+            <summary>
+            If this frame copies another frame, it isn't required to do a full copy.
+            </summary>
+        </member>
         <member name="F:Photon.Deterministic.DeterministicFrame.RawInputs">
             <summary>
             The raw inputs for the delta compressed input.
@@ -38426,8 +39548,8 @@
             <summary>
             Supports sending one game result during one session per client.
             Send this based on timing and simulation data of a verified frame to make results be comparable. 
-            Data can be any format but the size must be below <see cref="F:Photon.Deterministic.Protocol.GameResult.MaxSize"/>.
-            Zip compress Json for example to reduce the size.
+            Data expected be run through IAssetSerializer.ResultToByteArray(),
+            and the size must be below <see cref="F:Photon.Deterministic.Protocol.GameResult.MaxSize"/> 
             </summary>
             <param name="data">Serialized game result</param>
         </member>
@@ -38702,6 +39824,10 @@
             During a Session Update the simulator will advance through the following stages in order:
             BeforeVerification > Verification > AfterVerification > BeforePrediction > Prediction > AfterPrediction.
             </summary>
+            <remarks>
+            Every stage is entered and finished even when it has no frames to simulate, so the stage callbacks always run in
+            this order. A lockstep session is the exception: it never predicts and stops after AfterVerification.
+            </remarks>
         </member>
         <member name="F:Photon.Deterministic.SimulatorStage.BeforeVerification">
             <summary>
@@ -38767,17 +39893,62 @@
             <seealso cref="T:Photon.Deterministic.SimulatorStage"/>
             </summary>
         </member>
-        <member name="P:Photon.Deterministic.SimulatorContext.RollbackPrediction">
+        <member name="P:Photon.Deterministic.SimulatorContext.LatestVerifiedRolledBackTo">
             <summary>
-            If the latest Predicted state should be rolled back to the latest Verified state after the verification loop ends and before the prediction loop begins.
-            This property defaults to and is reset to <c>true</c> at the beginning of every Session Update.
+            The latest Verified tick that the Predicted state was rolled back to.
+            </summary>
+            <remarks>
+            Rollbacks are performed before the Prediction loop and this becomes the <see cref="P:Photon.Deterministic.SimulatorContext.TargetVerificationTick"/>.
+            When skipping rollbacks with <see cref="P:Photon.Deterministic.SimulatorContext.SkipPredictionRollbackIfPossible"/>, this will fall behind the
+            <see cref="P:Photon.Deterministic.SimulatorContext.TargetVerificationTick"/> and the window between them tells how outdated is the Verified state
+            that Predictions are based on relative to the latest Verified state.
+            </remarks>
+        </member>
+        <member name="P:Photon.Deterministic.SimulatorContext.SkipPredictionRollbackIfPossible">
+            <summary>
+            If a rollback of the Predicted state to the latest Verified state should be skipped, if possible.
+            See <see cref="P:Photon.Deterministic.SimulatorContext.IsRollbackRequired"/> for when rollbacks cannot be skipped.
+            This property defaults to and is reset to <c>false</c> at the beginning of every Session Update.
             Attempting to modify this value after the prediction loop has started will have no effect.
             </summary>
             <remarks>
-            Prediction Rollbacks are not performed if new Verified frames were not simulated on this Session Update.
-            Skipping prediction rollbacks saves on performance, but tends to cause more mispredictions, specially if done in multiple Session Update loops in sequence.
+            Prediction Rollbacks are NOT performed if new Verified frames were not simulated since the last rollback.
+            Skipping prediction rollbacks saves on performance, but tends to cause more mispredictions the larger is the
+            window between the latest Verified state and the last Verified state the Predicted stated was rolled back to.
             Prediction rollbacks must occur periodically and frequently in order to keep the predictions accurate.
+            <para>
+            Setting this to <see langword="true"/> is a request, not a guarantee: it is overridden when verification has
+            advanced past the tick the previous Session Update predicted to. See <see cref="P:Photon.Deterministic.SimulatorContext.IsRollbackRequired"/> and
+            <see cref="P:Photon.Deterministic.SimulatorContext.WillRollbackPrediction"/>.
+            </para>
             </remarks>
+        </member>
+        <member name="P:Photon.Deterministic.SimulatorContext.IsRollbackRequired">
+            <summary>
+            <see langword="true"/> when verification has reached past the tick the previous Session Update predicted to,
+            which forces a rollback regardless of <see cref="P:Photon.Deterministic.SimulatorContext.SkipPredictionRollbackIfPossible"/>.
+            </summary>
+            <remarks>
+            Predicting a tick the Verified state already passed would need input sets the simulator has already consumed and released.
+            Under normal conditions the Predicted state leads the Verified one and this stays <see langword="false"/>.
+            </remarks>
+        </member>
+        <member name="P:Photon.Deterministic.SimulatorContext.WillRollbackPrediction">
+            <summary>
+            Whether the Predicted state will still be rolled back to the Verified state on this Session Update. If a rollback
+            has already occurred, then this is <see langword="false"/> and <see cref="P:Photon.Deterministic.SimulatorContext.HasRolledBackPrediction"/> is <see langword="true"/>.
+            Rollbacks are only performed when there is a newer Verified state to rollback to
+            (<see cref="P:Photon.Deterministic.SimulatorContext.TargetVerificationTick"/> greater than <see cref="P:Photon.Deterministic.SimulatorContext.LatestVerifiedRolledBackTo"/>).
+            In that case, rollback is performed if not skipped with <see cref="P:Photon.Deterministic.SimulatorContext.SkipPredictionRollbackIfPossible"/> or
+            if <see cref="P:Photon.Deterministic.SimulatorContext.IsRollbackRequired"/>.
+            </summary>
+        </member>
+        <member name="P:Photon.Deterministic.SimulatorContext.HasRolledBackPrediction">
+            <summary>
+            If the Predicted state has been rolled back to the Verified state on this Session Update.
+            Always <see langword="false"/> up to and including the
+            <see cref="F:Photon.Deterministic.SimulatorStage.BeforePrediction">BeforePrediction</see> stage.
+            </summary>
         </member>
         <member name="P:Photon.Deterministic.SimulatorContext.TicksToVerify">
             <summary>
@@ -38789,14 +39960,37 @@
             Values set are clamped between the number of frames already Verified and the max number of verifiable frames.
             </remarks>
         </member>
-        <member name="P:Photon.Deterministic.SimulatorContext.TargetPredictedTick">
+        <member name="P:Photon.Deterministic.SimulatorContext.RollbackWindow">
             <summary>
-            The last Predicted tick that should be simulated in this Session Update. Defaults to the latest predictable tick
-            by the simulator, i.e. the latest tick that had local inputs polled for.
+            Mirrors <see cref="P:Photon.Deterministic.DeterministicSession.RollbackWindow"/>.
+            </summary>
+        </member>
+        <member name="P:Photon.Deterministic.SimulatorContext.MaxPredictedTicks">
+            <summary>
+            The number of Predicted frames this Session Update may simulate in total, counted from <see cref="P:Photon.Deterministic.SimulatorContext.PredictedFromTick"/>.
+            Defaults to and is reset to <see cref="F:System.Int32.MaxValue"/> at the beginning of every Session Update,
+            leaving the <see cref="P:Photon.Deterministic.SimulatorContext.MaxPredictableTick"/> as the only limit.
             </summary>
             <remarks>
+            This is the prediction counterpart of <see cref="P:Photon.Deterministic.DeterministicSession.MaxVerifiedTicksPerUpdate"/> and
+            shares the same underlying field as <see cref="P:Photon.Deterministic.SimulatorContext.TargetPredictedTick"/> with different semantics:
+            writing either one overwrites the other.
+            <para>
             Attempting to modify this value after the Prediction stage has ended will have no effect.
-            Values set are clamped between the latest Predicted frame already simulated and the <see cref="P:Photon.Deterministic.SimulatorContext.MaxPredictableTick"/>.
+            Values set are clamped to <see cref="P:Photon.Deterministic.SimulatorContext.TicksPredicted"/> or greater.
+            </para>
+            </remarks>
+        </member>
+        <member name="P:Photon.Deterministic.SimulatorContext.TargetPredictedTick">
+            <summary>
+            Sets the last Predicted tick that should be simulated in this Session Update by limiting the <see cref="P:Photon.Deterministic.SimulatorContext.MaxPredictedTicks"/>.
+            Defaults to the latest predictable tick by the simulator, i.e. the latest tick that had local inputs polled for.
+            </summary>
+            <remarks>
+            A view over <see cref="P:Photon.Deterministic.SimulatorContext.MaxPredictedTicks"/>, which is where the limit is stored: writing either one overwrites
+            the other. Reads never report past the <see cref="P:Photon.Deterministic.SimulatorContext.MaxPredictableTick"/>, and writes are clamped to the latest
+            Predicted frame already simulated or later.
+            Attempting to modify this value after the Prediction stage has ended will have no effect.
             </remarks>
         </member>
         <member name="P:Photon.Deterministic.SimulatorContext.TicksVerified">
@@ -38818,13 +40012,14 @@
             <summary>
             The tick from which predictions started or will start on this Session Update.
             By default, this is the <see cref="P:Photon.Deterministic.SimulatorContext.TargetVerificationTick"/>, but can instead be the <see cref="P:Photon.Deterministic.SimulatorContext.PreviousUpdatePredictedTick"/>
-            if <see cref="P:Photon.Deterministic.SimulatorContext.RollbackPrediction"/> is false.
+            when the rollback is skipped. See <see cref="P:Photon.Deterministic.SimulatorContext.WillRollbackPrediction"/>.
             </summary>
         </member>
         <member name="P:Photon.Deterministic.SimulatorContext.TicksToPredict">
             <summary>
             The total number of Predicted frames that will be simulated on this Session Update in order to reach from
-            <see cref="P:Photon.Deterministic.SimulatorContext.PredictedFromTick"/> to the <see cref="P:Photon.Deterministic.SimulatorContext.TargetPredictedTick"/>.
+            <see cref="P:Photon.Deterministic.SimulatorContext.PredictedFromTick"/> towards the <see cref="P:Photon.Deterministic.SimulatorContext.TargetPredictedTick"/>, limited by the rollback window.
+            Zero if the session is stalling.
             </summary>
         </member>
         <member name="P:Photon.Deterministic.SimulatorContext.TicksSimulated">
@@ -38877,6 +40072,12 @@
             The next frame the simulator intends to simulate, either Verified or Predicted. <c>null</c> if there are no ticks pending simulation.
             </summary>
         </member>
+        <member name="M:Photon.Deterministic.SimulatorContext.RejectLateWrite(System.String,Photon.Deterministic.SimulatorStage)">
+            <summary>
+            Reports and rejects a write that arrives after <paramref name="lastUsableStage"/>, the last stage during which
+            it would still change this Session Update.
+            </summary>
+        </member>
         <member name="P:Photon.Deterministic.DeterministicSimulator.FramePredicted">
             <summary>
             Latest locally predicted copy of the game state.
@@ -38889,7 +40090,11 @@
         </member>
         <member name="P:Photon.Deterministic.DeterministicSimulator.FramePreviousUpdatePredicted">
             <summary>
-            Latest simulated copy of the Frame that was last-Predicted during the previous main session update. Used to calculate transform view error for smoothed correction.
+            The latest version of the last frame predicted in the previous session update.
+            <para>
+            If the last frame predicted in the previous session update is re-simulated or verified by the current session update, this copy will be the updated version.
+            </para>
+            This copy is then used to calculate and smoothly correct transform view errors caused by misprediction.
             </summary>
         </member>
         <member name="M:Photon.Deterministic.DeterministicSimulator.GetVerifiableTicksCount">
@@ -41602,6 +42807,11 @@
             The current number of predicted frames.
             </summary>
         </member>
+        <member name="P:Photon.Deterministic.DeterministicStats.RolledBack">
+            <summary>
+            If the Predicted state was rolled back to the Verified state.
+            </summary>
+        </member>
         <member name="P:Photon.Deterministic.DeterministicStats.ResimulatedFrames">
             <summary>
             Not used anymore.
@@ -41620,6 +42830,16 @@
         <member name="P:Photon.Deterministic.DeterministicStats.VerificationTime">
             <summary>
             The total time spent in simulating verified frames in seconds.
+            </summary>
+        </member>
+        <member name="P:Photon.Deterministic.DeterministicStats.FrameCopyTime">
+            <summary>
+            The total time spend copying frames in the last update.
+            </summary>
+        </member>
+        <member name="P:Photon.Deterministic.DeterministicStats.FrameCopies">
+            <summary>
+            The total number of frames copied  in the last update.
             </summary>
         </member>
         <member name="T:Photon.Deterministic.StopwatchTimer">

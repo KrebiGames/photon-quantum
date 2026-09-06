@@ -8,7 +8,7 @@ namespace Quantum.Editor {
   using UnityEngine.Pool;
 
 
-  [ScriptedImporter(17, Extension, 100000)]
+  [ScriptedImporter(18, Extension, 100000)]
   public partial class QuantumEntityPrototypeAssetObjectImporter : ScriptedImporter {
     public const string Extension = "qprototype";
     public const string ExtensionWithDot = ".qprototype";

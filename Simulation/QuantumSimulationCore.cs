@@ -736,7 +736,7 @@ namespace Quantum {
     /// </summary>
     public override sealed Map Map {
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      get => FindAsset<Map>(MapAssetRef);
+      get => FindAsset(MapAssetRef);
       set => MapAssetRef = value;
     }
 
@@ -808,7 +808,7 @@ namespace Quantum {
       }
 
       // assign map, rng session, etc.
-      GlobalsCore->Map = FindAsset<Map>(runtimeConfig.Map.Id);
+      GlobalsCore->Map = FindAsset(runtimeConfig.Map);
       GlobalsCore->RngSession = new RNGSession(runtimeConfig.Seed);
       GlobalsCore->DeltaTime = deltaTime;
 
@@ -3751,13 +3751,13 @@ namespace Quantum {
         if (simulationConfig.Id.IsValid == false) {
           throw new ArgumentException("No SimulationConfig set. Register one with the RuntimeConfig that the simulation is started with.");
         }
-        Configurations.Simulation = (SimulationConfig)_resourceManager.GetAsset(simulationConfig.Id);
+        Configurations.Simulation = _resourceManager.GetAsset(simulationConfig);
         Assert.Always(Configurations.Simulation != null, "RuntimeConfig.SimulationConfig with asset id {0} was not found", simulationConfig.Id);
 
         // register commands
         Session.CommandSerializer.RegisterFactories(DeterministicCommandSetup.GetCommandFactories(Configurations.Runtime, Configurations.Simulation));
 
-        var systemsConfig = (SystemsConfig)_resourceManager.GetAsset(Configurations.Runtime.SystemsConfig.Id);
+        var systemsConfig = _resourceManager.GetAsset(Configurations.Runtime.SystemsConfig);
 
         // initialize systems
         _systemsRoot = DeterministicSystemSetup.CreateSystems(Configurations.Runtime, Configurations.Simulation, systemsConfig).Where(x => x != null).ToArray();
@@ -7802,8 +7802,7 @@ namespace Quantum {
       var resourceManager = ResourceManager as ResourceManagerStatic;
       var runtimeConfig = AssetSerializer.ConfigFromByteArray<RuntimeConfig>(args.RuntimeConfig, compressed: true);
 
-      var simulationConfig = (SimulationConfig)resourceManager.GetAsset(runtimeConfig.SimulationConfig.Id);
-      if (simulationConfig != null) {
+      if (resourceManager.TryGetAsset(runtimeConfig.SimulationConfig, out var simulationConfig)) {
         _commandSerializer = new DeterministicCommandSerializer();
         _commandSerializer.RegisterFactories(DeterministicCommandSetup.GetCommandFactories(runtimeConfig, simulationConfig));
         _commandSerializer.CommandSerializerStreamRead.Reading = true;
@@ -10257,10 +10256,10 @@ namespace Quantum.Core {
         
         // Handle cases where a dynamic map was created based on a non-loaded map:
         // If the new map is a dynamicMap, create map entities from the source map if the source map is different than the previous map.
-        if (isDynamicMap && dynamicMap.SourceMap != previousMap) {
+        if (isDynamicMap && dynamicMap.SourceMap.Id.IsValid && dynamicMap.SourceMap != previousMap) {
           var sourceMap = frame.FindAsset(dynamicMap.SourceMap);
           if (sourceMap != null) {
-            frame.Create(frame.Map.MapEntities, sourceMap);
+            frame.Create(sourceMap.MapEntities, sourceMap);
           }
         }
       }

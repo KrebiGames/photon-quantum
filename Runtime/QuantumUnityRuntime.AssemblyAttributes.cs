@@ -20,11 +20,17 @@
 
 // merged AssemblyAttributes
 
+#region DetectEnableProfiler.cs
+
+[assembly: Quantum.MarkProfilerAsEnabledIfEnableProfilerDefinedAttribute]
+
+#endregion
+
+
 #region DetectUnityDefines.cs
 
 [assembly: Quantum.MarkPlatformAsIL2CPPIfEnableIL2CPPDefined]
 [assembly: Quantum.MarkPlatformAsWebIfUnityWebGlDefined]
-[assembly: Quantum.MarkProfilerAsEnabledIfEnableProfilerDefinedAttribute]
 
 #endregion
 

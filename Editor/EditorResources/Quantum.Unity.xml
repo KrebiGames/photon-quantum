@@ -1046,13 +1046,6 @@
             These values will be applied to the transform in the LateUpdate.
             </summary>
         </member>
-        <member name="M:Quantum.QuantumRagdoll.RagdollLimbUpdate.CompareTo(Quantum.QuantumRagdoll.RagdollLimbUpdate)">
-            <summary>
-            
-            </summary>
-            <param name="other"></param>
-            <returns></returns>
-        </member>
         <member name="F:Quantum.QuantumRagdoll.BakeMode.Immediate">
             <summary>
             Apply the ragdoll settings every frame in Unity Edit Mode.
@@ -3021,7 +3014,7 @@
         </member>
         <member name="P:Quantum.QuantumGlobalScriptableObjectResourceAttribute.InstantiateIfLoadedInEditor">
             <summary>
-            If loaded in the editor, should the result be instantiated instead of returning the asset itself? The default is <see langword="true"/>. 
+            If loaded in the editor, should the result be instantiated instead of returning the asset itself? The default is <see langword="true"/>.
             </summary>
         </member>
         <member name="M:Quantum.QuantumGlobalScriptableObjectResourceAttribute.Load(System.Type)">
@@ -7565,22 +7558,22 @@
             Gets all the root GameObjects, sorted by their simbling index.
             </summary>
         </member>
-        <member name="M:Quantum.QuantumUnitySceneManagerUtils.GetSingleComponentOrThrow``1(UnityEngine.SceneManagement.Scene,System.Boolean)">
+        <member name="M:Quantum.QuantumUnitySceneManagerUtils.GetSingleComponentOrThrow``1(UnityEngine.SceneManagement.Scene,System.Boolean,System.Predicate{``0})">
             <summary>
             Gets a component on a scene. If there are none or more than one, throws an exception.
             </summary>
         </member>
-        <member name="M:Quantum.QuantumUnitySceneManagerUtils.GetComponentInHierarchyOrder``1(UnityEngine.SceneManagement.Scene,System.Boolean)">
+        <member name="M:Quantum.QuantumUnitySceneManagerUtils.GetComponentInHierarchyOrder``1(UnityEngine.SceneManagement.Scene,System.Boolean,System.Predicate{``0})">
+            <summary>
+            Gets first component on a scene.
+            </summary>
+        </member>
+        <member name="M:Quantum.QuantumUnitySceneManagerUtils.GetComponentsInHierarchyOrder``1(UnityEngine.SceneManagement.Scene,System.Boolean,System.Predicate{``0})">
             <summary>
             Gets all the component present on a scene, depth first.
             </summary>
         </member>
-        <member name="M:Quantum.QuantumUnitySceneManagerUtils.GetComponentsInHierarchyOrder``1(UnityEngine.SceneManagement.Scene,System.Boolean)">
-            <summary>
-            Gets all the component present on a scene, depth first.
-            </summary>
-        </member>
-        <member name="M:Quantum.QuantumUnitySceneManagerUtils.GetComponentsInHierarchyOrder``1(System.Collections.Generic.IList{UnityEngine.GameObject},System.Boolean)">
+        <member name="M:Quantum.QuantumUnitySceneManagerUtils.GetComponentsInHierarchyOrder``1(System.Collections.Generic.IList{UnityEngine.GameObject},System.Boolean,System.Predicate{``0})">
             <summary>
             Gets all the component present on a scene, depth first.
             </summary>
@@ -8362,27 +8355,15 @@
             Otherwise, the updating of a parent transform position right after its child position will mess with the limb position.
             </summary>
         </member>
-        <member name="F:Quantum.QuantumRagdollLimbView._depth">
-            <summary>
-            The depth of the body's limb or part based on its unity's transform hierarchy. 
-            </summary>
-        </member>
-        <member name="F:Quantum.QuantumRagdollLimbView._ragdollView">
-            <summary>
-            A reference to the Unity's ragdoll editor. It will update
-            </summary>
-        </member>
         <member name="P:Quantum.QuantumRagdollLimbView.Ragdoll">
             <summary>
             The <see cref="T:Quantum.QuantumRagdoll"/> that baked this limb. Used to track the ownership of the baked components.
             </summary>
         </member>
-        <member name="M:Quantum.QuantumRagdollLimbView.SetRoot(Quantum.QuantumRagdoll,System.Int32)">
+        <member name="P:Quantum.QuantumRagdollLimbView.HasOverrides">
             <summary>
-            Setup the root of the ragdoll system as a <see cref="T:Quantum.QuantumRagdoll"/> and set the level of depth of this limb.
+            True when any of the per-limb override deltas is not zero.
             </summary>
-            <param name="ragdoll"></param>
-            <param name="depth"></param>
         </member>
         <member name="M:Quantum.QuantumRagdollLimbView.ApplyTransform(Quantum.QuantumEntityView.UpdatePositionParameter@)">
             <summary>

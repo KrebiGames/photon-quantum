@@ -468,11 +468,9 @@ namespace Quantum {
         return;
       }
 
-      var scale = from.IsScaledBySourceCollider ? FPVector2.One : t.lossyScale.ToRoundedFPVector2();
-
-      var absScale = scale;
-      absScale.X = FPMath.Abs(absScale.X);
-      absScale.Y = FPMath.Abs(absScale.Y);
+      var lossyScale = t.lossyScale.ToRoundedFPVector2();
+      var scale = from.IsScaledBySourceCollider ? FPVector2.One : lossyScale;
+      var absScale = FPVector2.Abs(scale);
 
       scaledTo.BoxExtents.X *= absScale.X;
       scaledTo.BoxExtents.Y *= absScale.Y;
@@ -493,14 +491,17 @@ namespace Quantum {
       for (int i = 0; i < scaledTo.CompoundShapes.Length; i++) {
         ref var scaledCompoundTo = ref scaledTo.CompoundShapes[i];
 
-        scaledCompoundTo.BoxExtents.X *= absScale.X;
-        scaledCompoundTo.BoxExtents.Y *= absScale.Y;
-        scaledCompoundTo.CircleRadius *= FPMath.Max(absScale.X, absScale.Y);
-        scaledCompoundTo.EdgeExtent *= absScale.X;
-        scaledCompoundTo.CapsuleSize.X *= absScale.X;
-        scaledCompoundTo.CapsuleSize.Y *= absScale.Y;
-        scaledCompoundTo.PositionOffset.X *= absScale.X;
-        scaledCompoundTo.PositionOffset.Y *= absScale.Y;
+        var entryScale = from.CompoundShapes[i].IsScaledBySourceCollider ? FPVector2.One : lossyScale;
+        var entryAbsScale = FPVector2.Abs(entryScale);
+
+        scaledCompoundTo.BoxExtents.X *= entryAbsScale.X;
+        scaledCompoundTo.BoxExtents.Y *= entryAbsScale.Y;
+        scaledCompoundTo.CircleRadius *= FPMath.Max(entryAbsScale.X, entryAbsScale.Y);
+        scaledCompoundTo.EdgeExtent *= entryAbsScale.X;
+        scaledCompoundTo.CapsuleSize.X *= entryAbsScale.X;
+        scaledCompoundTo.CapsuleSize.Y *= entryAbsScale.Y;
+        scaledCompoundTo.PositionOffset.X *= entryScale.X;
+        scaledCompoundTo.PositionOffset.Y *= entryScale.Y;
       }
     }
 
@@ -509,35 +510,17 @@ namespace Quantum {
         return;
       }
 
-      var scale = from.IsScaledBySourceCollider ? FPVector3.One : t.lossyScale.ToRoundedFPVector3();
-
-      var absScale = scale;
-      absScale.X = FPMath.Abs(absScale.X);
-      absScale.Y = FPMath.Abs(absScale.Y);
-      absScale.Z = FPMath.Abs(absScale.Z);
-
-      var sphereRadius = FPMath.Max(absScale.X, absScale.Y, absScale.Z);
+      var lossyScale = t.lossyScale.ToRoundedFPVector3();
+      var scale = from.IsScaledBySourceCollider ? FPVector3.One : lossyScale;
+      var absScale = FPVector3.Abs(scale);
 
       scaledTo.BoxExtents.X *= absScale.X;
       scaledTo.BoxExtents.Y *= absScale.Y;
       scaledTo.BoxExtents.Z *= absScale.Z;
 
-      scaledTo.SphereRadius *= sphereRadius;
+      scaledTo.SphereRadius *= FPMath.Max(absScale.X, absScale.Y, absScale.Z);
 
-      switch (from.CapsuleDirection) {
-        case Quantum.CapsuleDirection3D.X:
-          scaledTo.CapsuleRadius *= FPMath.Max(absScale.Y, absScale.Z);
-          scaledTo.CapsuleHeight *= absScale.X;
-          break;
-        case Quantum.CapsuleDirection3D.Y:
-          scaledTo.CapsuleRadius *= FPMath.Max(absScale.X, absScale.Z);
-          scaledTo.CapsuleHeight *= absScale.Y;
-          break;
-        case Quantum.CapsuleDirection3D.Z:
-          scaledTo.CapsuleRadius *= FPMath.Max(absScale.X, absScale.Y);
-          scaledTo.CapsuleHeight *= absScale.Z;
-          break;
-      }
+      ScaleCapsule3D(from.CapsuleDirection, absScale, ref scaledTo.CapsuleRadius, ref scaledTo.CapsuleHeight);
       
       scaledTo.PositionOffset.X *= scale.X;
       scaledTo.PositionOffset.Y *= scale.Y;
@@ -553,30 +536,37 @@ namespace Quantum {
       for (int i = 0; i < scaledTo.CompoundShapes.Length; i++) {
         ref var scaledCompoundTo = ref scaledTo.CompoundShapes[i];
 
-        scaledCompoundTo.BoxExtents.X *= absScale.X;
-        scaledCompoundTo.BoxExtents.Y *= absScale.Y;
-        scaledCompoundTo.BoxExtents.Z *= absScale.Z;
+        var entryScale = from.CompoundShapes[i].IsScaledBySourceCollider ? FPVector3.One : lossyScale;
+        var entryAbsScale = FPVector3.Abs(entryScale);
 
-        scaledCompoundTo.SphereRadius *= sphereRadius;
+        scaledCompoundTo.BoxExtents.X *= entryAbsScale.X;
+        scaledCompoundTo.BoxExtents.Y *= entryAbsScale.Y;
+        scaledCompoundTo.BoxExtents.Z *= entryAbsScale.Z;
 
-        switch (from.CapsuleDirection) {
-          case Quantum.CapsuleDirection3D.X:
-            scaledCompoundTo.CapsuleRadius *= FPMath.Max(absScale.Y, absScale.Z);
-            scaledCompoundTo.CapsuleHeight *= absScale.X;
+        scaledCompoundTo.SphereRadius *= FPMath.Max(entryAbsScale.X, entryAbsScale.Y, entryAbsScale.Z);
+
+        ScaleCapsule3D(scaledCompoundTo.CapsuleDirection, entryAbsScale, ref scaledCompoundTo.CapsuleRadius, ref scaledCompoundTo.CapsuleHeight);
+
+        scaledCompoundTo.PositionOffset.X *= entryScale.X;
+        scaledCompoundTo.PositionOffset.Y *= entryScale.Y;
+        scaledCompoundTo.PositionOffset.Z *= entryScale.Z;
+      }
+      
+      static void ScaleCapsule3D(CapsuleDirection3D direction, FPVector3 absScale, ref FP radius, ref FP height) {
+        switch (direction) {
+          case CapsuleDirection3D.X:
+            radius *= FPMath.Max(absScale.Y, absScale.Z);
+            height *= absScale.X;
             break;
-          case Quantum.CapsuleDirection3D.Y:
-            scaledCompoundTo.CapsuleRadius *= FPMath.Max(absScale.X, absScale.Z);
-            scaledCompoundTo.CapsuleHeight *= absScale.Y;
+          case CapsuleDirection3D.Y:
+            radius *= FPMath.Max(absScale.X, absScale.Z);
+            height *= absScale.Y;
             break;
-          case Quantum.CapsuleDirection3D.Z:
-            scaledCompoundTo.CapsuleRadius *= FPMath.Max(absScale.X, absScale.Y);
-            scaledCompoundTo.CapsuleHeight *= absScale.Z;
+          case CapsuleDirection3D.Z:
+            radius *= FPMath.Max(absScale.X, absScale.Y);
+            height *= absScale.Z;
             break;
         }
-
-        scaledCompoundTo.PositionOffset.X *= absScale.X;
-        scaledCompoundTo.PositionOffset.Y *= absScale.Y;
-        scaledCompoundTo.PositionOffset.Z *= absScale.Z;
       }
     }
 

@@ -145,7 +145,7 @@ namespace Quantum.Editor {
       } else {
         var pluginSdkFullPath = Path.GetFullPath($"{GetUnityProjectRoot}/{PluginSdkPath}");
         QuantumEditorLog.Log("Plugin Sdk found at: " + pluginSdkFullPath);
-        var solutionPath = Directory.GetFiles(pluginSdkFullPath, "*.sln").FirstOrDefault();
+        var solutionPath = new[] { "*.sln", "*.slnx" }.SelectMany(pattern => Directory.GetFiles(pluginSdkFullPath, pattern)).FirstOrDefault();
         if (string.IsNullOrEmpty(solutionPath) == false) {
           PluginSolutionPath = PathUtils.Normalize(Path.GetRelativePath(GetUnityProjectRoot, solutionPath));
         }
@@ -379,15 +379,17 @@ namespace Quantum.Editor {
     /// Open the project folder in the file explorer.
     /// </summary>
     public static void OpenDotnetSolution(QuantumDotnetBuildSettings settings, bool openAsUrl = false) {
-      var path = $"{Path.GetFullPath(settings.ProjectBasePath)}/Quantum.Dotnet.sln";
-      if (File.Exists(path)) {
+      var path = new[] { "sln", "slnx" }
+        .Select(ext => $"{Path.GetFullPath(settings.ProjectBasePath)}/Quantum.Dotnet.{ext}")
+        .FirstOrDefault(File.Exists);
+      if (path != null) {
         if (openAsUrl) {
           Application.OpenURL(new Uri(path).AbsoluteUri);
         } else {
           EditorUtility.RevealInFinder(path);
         }
       } else {
-        QuantumEditorLog.Warn($"Project folder {path} not found. Generate it first.");
+        QuantumEditorLog.Warn($"Solution file not found in {Path.GetFullPath(settings.ProjectBasePath)}. Generate it first.");
       }
     }
 

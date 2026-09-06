@@ -290,6 +290,12 @@
             Register a handler that will be called when an addressable asset with a specific label is added or removed.
             </summary>
         </member>
+        <member name="M:Quantum.Editor.AssetDatabaseUtils.GetAddressablesContentHash">
+            <summary>
+            Hash of the serialized addressable settings and group assets. Unlike <see cref="P:UnityEditor.AddressableAssets.Settings.AddressableAssetSettings.currentHash"/>,
+            it only changes when the assets are saved, making it deterministic across MPPM instances and editor sessions.
+            </summary>
+        </member>
         <member name="M:Quantum.Editor.AssetDatabaseUtils.SetAssetAndTheMainAssetDirty(UnityEngine.Object)">
             <summary>
             Sets the asset dirty and, if is a sub-asset, also sets the main asset dirty.
@@ -325,6 +331,11 @@
         <member name="M:Quantum.Editor.AssetDatabaseUtils.GetAssetGuidOrThrow(UnityEngine.Object)">
             <summary>
             Returns the asset GUID for the given object reference or throws an exception if the asset is not found.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.AssetDatabaseUtils.GetAssetPathOrThrow(UnityEditor.GUID)">
+            <summary>
+            Returns the asset path for the given asset GUID or throws an exception if the asset is not found.
             </summary>
         </member>
         <member name="M:Quantum.Editor.AssetDatabaseUtils.GetGUIDAndLocalFileIdentifierOrThrow``1(UnityEngine.LazyLoadReference{``0})">
@@ -434,23 +445,6 @@
             Adds or removes <paramref name="define"/> from all <see cref="T:UnityEditor.BuildTargetGroup"/>s, depending on the value of <paramref name="enable"/>
             </summary>
         </member>
-        <member name="M:Quantum.Editor.AssetDatabaseUtils.IterateAssets``1(System.String,System.String)">
-            <summary>
-            Iterates over all assets in the project that match the given search criteria, without
-            actually loading them.
-            </summary>
-            <param name="root">The optional root folder</param>
-            <param name="label">The optional label</param>
-        </member>
-        <member name="M:Quantum.Editor.AssetDatabaseUtils.IterateAssets(System.String,System.String,System.Type)">
-            <summary>
-            Iterates over all assets in the project that match the given search criteria, without
-            actually loading them.
-            </summary>
-            <param name="root">The optional root folder</param>
-            <param name="label">The optional label</param>
-            <param name="type">The optional type</param>
-        </member>
         <member name="M:Quantum.Editor.AssetDatabaseUtils.IsPathWritable(System.String)">
             <summary>
             Checks if given path is read only. This can happen e.g. for non-local and non-embedded packages.
@@ -464,6 +458,11 @@
         <member name="M:Quantum.Editor.AssetDatabaseUtils.TryGetImporter``1(UnityEngine.Object,``0@)">
             <summary>
             Gets the importer for a given <paramref name="asset"/>
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.AssetDatabaseUtils.GetNativeTypeName(System.Type)">
+            <summary>
+            Instance-free equivalent of <see cref="M:UnityEditor.ObjectNames.GetClassName(UnityEngine.Object)"/>
             </summary>
         </member>
         <member name="M:Quantum.Editor.AssetDatabaseUtils.RegisterCustomDependencyWithMppmWorkaround(System.String,UnityEngine.Hash128)">
@@ -481,6 +480,23 @@
             <summary>
             Returns the address of an asset or an empty string, if either Addressables are disabled or the asset is not addressable.
             </summary>
+        </member>
+        <member name="M:Quantum.Editor.AssetDatabaseUtils.IterateAssets``1(System.String,System.String)">
+            <summary>
+            Iterates over all assets in the project that match the given search criteria, without
+            actually loading them.
+            </summary>
+            <param name="root">The optional root folder</param>
+            <param name="label">The optional label</param>
+        </member>
+        <member name="M:Quantum.Editor.AssetDatabaseUtils.IterateAssets(System.String,System.String,System.Type)">
+            <summary>
+            Iterates over all assets in the project that match the given search criteria, without
+            actually loading them.
+            </summary>
+            <param name="root">The optional root folder</param>
+            <param name="label">The optional label</param>
+            <param name="type">The optional type</param>
         </member>
         <member name="T:Quantum.Editor.QuantumDotnetBuildSettingsInspector">
             <summary>
@@ -531,6 +547,136 @@
         </member>
         <member name="P:Quantum.Editor.QuantumEditorHubWidget.HasTypeAndTypeIsValid">
             TODO: potentially slow 
+        </member>
+        <member name="T:Quantum.Editor.QuantumEditorHubWidgetDocDownload">
+            <summary>
+            Widget to download and update online doc md files.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.TryGetSavedFolderPath(System.String@)">
+            <summary>
+            Resolves the folder saved in player prefs against the project root,
+            so a changed editor working directory cannot redirect the path to a wrong directory.
+            Without a saved key, falls back to a documentation install found inside the default
+            parent folder (e.g. committed to version control by someone else) and saves the key,
+            so the widget behaves as if it was installed locally.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.DrawActionRow(UnityEngine.Rect,UnityEngine.GUIContent,System.String,System.Int32,System.Int32)">
+            <summary>
+            Draws an icon button with a label to its right, indented to the widget text column. Returns true when the button was clicked.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.InstallDocumentation(Quantum.Editor.QuantumEditorHubWidget,System.Boolean)">
+            <summary>
+            Asks the user for a target folder, then installs the documentation from the selected source into it.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.UpdateDocumentation(Quantum.Editor.QuantumEditorHubWidget,System.Boolean)">
+            <summary>
+            Fetches the documentation again from the selected source and replaces the content of the saved folder.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.OpenDocumentationFolder">
+            <summary>
+            Opens the documentation folder in the file explorer.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.UninstallDocumentation">
+            <summary>
+            Deletes the documentation folder and the player prefs key after user confirmation.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.HasDocumentationDownloadContent">
+            <summary>
+            Returns true when the documentation folder was saved to player prefs and it still exists and has content.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.TrySelectFolder(System.String,System.String,System.String,System.String@)">
+            <summary>
+            Asks the user to select a folder and saves it to player prefs.
+            A previously saved folder is used as the initial selection of the dialog.
+            Selecting the Assets folder or the project root is denied, a subfolder is required.
+            </summary>
+            <param name="dialogTitle">Title used for the folder selection dialog and error popups.</param>
+            <param name="playerPrefsKey">Player prefs key the selected folder is saved to and read from.</param>
+            <param name="defaultFolderName">Folder name suggested by the selection dialog when no folder was saved yet.</param>
+            <param name="folderPath">The resulting absolute folder path.</param>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.ExtractDocumentationFromSourceAsync(Quantum.Editor.QuantumEditorHubWidget,System.String,System.Boolean)">
+            <summary>
+            Extracts the documentation zip into the folder, downloaded from the widget url or read from the widget zip asset.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.GetPackageZipPath(Quantum.Editor.QuantumEditorHubWidget)">
+            <summary>
+            Returns the physical path of the zip asset referenced by the widget, null when no asset is assigned.
+            Asset paths are virtual (Assets/ or Packages/, package content resides in Library/PackageCache),
+            GetPhysicalPath maps them to the location on disk.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.GetPackageZipVersion(Quantum.Editor.QuantumEditorHubWidget)">
+            <summary>
+            Reads and parses the version file inside the widget zip asset, cached per asset path.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.GetWebDocumentationVersion(System.String)">
+            <summary>
+            Returns the version of the online documentation, fetched once per url in the background.
+            Returns null while the fetch is still running, the next repaint picks up the result.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.FetchWebDocumentationVersionAsync(System.String)">
+            <summary>
+            Fetches the version of the online documentation behind the url.
+            TODO: dummy implementation, returns the currently installed version instead of querying the endpoint.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.ExtractDocumentationFromAsset(Quantum.Editor.QuantumEditorHubWidget,System.String)">
+            <summary>
+            Reads the zip archive from the widget asset reference and extracts it into the folder.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.DownloadAndExtractDocumentationAsync(System.String,System.String)">
+            <summary>
+            Downloads the documentation zip archive from the url and extracts it into the folder, showing a progress bar.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.GetDocumentationDownloadVersion">
+            <summary>
+            Returns the content of the version file inside the saved documentation folder, empty when not available.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.GetUpdateRowLabel(System.String,System.String,System.String)">
+            <summary>
+            Builds the update row label: no suffix without a known available version, "(version: ...)" when up to date
+            and a highlighted "(new version available: ...)" when the available version is newer than the installed one.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.FormatVersionForDisplay(System.String)">
+            <summary>
+            Converts the leading ISO date of the version to European notation for display, e.g. "2026-08-14" to "14.08.2026".
+            The internal version strings stay in ISO format, their dates compare lexicographically.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.IsVersionNewer(System.String,System.String)">
+            <summary>
+            Returns true when the candidate version is newer than the installed version.
+            A different product/version slug counts as newer, otherwise the leading dates
+            of the parsed version strings ("{yyyy-MM-dd} {product} {version}") are compared.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.ParseDocumentationVersion(System.String)">
+            <summary>
+            Parses the version file content ("key: value" lines) into the generated date "{yyyy-MM-dd}", e.g. "2026-08-14".
+            Falls back to the first line of the file when the generated key is missing.
+            </summary>
+        </member>
+        <member name="M:Quantum.Editor.QuantumEditorHubWidgetDocDownload.ExtractDocumentationDownload(System.Byte[],System.String,System.Single)">
+            <summary>
+            Extracts the downloaded documentation zip into the folder, deleting and replacing any existing content.
+            The zip is extracted into a temporary sibling folder first, so invalid downloads or a failed extraction leave the existing content untouched.
+            </summary>
         </member>
         <member name="T:Quantum.Editor.QuantumEditorHubWidgetType">
             <summary/>
@@ -1480,6 +1626,12 @@
             <param name="name">Asset name</param>
             <returns>The asset matching the type and name</returns>
         </member>
+        <member name="T:Quantum.Editor.QuantumRagdollEditor">
+            <summary>
+            Custom inspector for <see cref="T:Quantum.QuantumRagdoll"/>. While the ragdoll is selected and the edit colliders toggle
+            in the inspector is active, interactable gizmos are drawn in the scene view over the baked limb colliders.
+            </summary>
+        </member>
         <member name="T:Quantum.Editor.GuidFileId">
             <summary/>
         </member>
@@ -1551,6 +1703,16 @@
              Note that if <see cref="M:UnityEditor.AssetDatabase.IsAssetImportWorkerProcess"/> returns true, the immediate refresh will result with an error.
              </summary>
              <param name="forceImmediate"></param>
+        </member>
+        <member name="M:Quantum.Editor.QuantumCustomDependency.Update(System.Boolean)">
+            <summary/>
+        </member>
+        <member name="T:Quantum.Editor.QuantumCustomDependencyEagerAttribute">
+            <summary>
+            If added to a <see cref="T:Quantum.Editor.QuantumCustomDependency"/> field, the dependency will be calculated
+            on the first InitializeOnLoad, but without AssetDatabase.Refresh. This is to avoid refreshing
+            assets due to initial 0 value of the dependency hash.
+            </summary>
         </member>
         <member name="T:Quantum.Editor.QuantumEditor">
             <summary>

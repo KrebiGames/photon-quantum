@@ -3,6 +3,7 @@ namespace Quantum.Editor {
   using System.Collections.Generic;
   using System.Linq;
   using UnityEditor;
+  using UnityEditor.Callbacks;
   using UnityEngine;
   using Object = UnityEngine.Object;
 
@@ -310,6 +311,7 @@ namespace Quantum.Editor {
 
 #if !QUANTUM_DISABLE_HUB_POPUP
   class QuantumEditorHubWindowAssetPostprocessor : AssetPostprocessor {
+    [RunAfterClass(typeof(QuantumGlobalScriptableObjectUtils.PostProcessor))]
     static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths) {
       // Unity handling for post asset processing callback. Checks existence of settings assets every time assets change.
       QuantumEditorHubWindow.CheckPopupCondition();

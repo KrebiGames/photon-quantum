@@ -2187,6 +2187,579 @@ namespace Quantum.Editor {
 #endregion
 
 
+#region Assets/Photon/Quantum/Editor/CustomEditors/QuantumRagdollEditor.cs
+
+namespace Quantum.Editor {
+  using Photon.Deterministic;
+  using System.Collections.Generic;
+  using System.Globalization;
+  using UnityEditor;
+  using UnityEditor.IMGUI.Controls;
+  using UnityEngine;
+
+  /// <summary>
+  /// Custom inspector for <see cref="QuantumRagdoll"/>. While the ragdoll is selected and the edit colliders toggle
+  /// in the inspector is active, interactable gizmos are drawn in the scene view over the baked limb colliders.
+  /// </summary>
+  [CustomEditor(typeof(QuantumRagdoll), true)]
+  [CanEditMultipleObjects]
+  public class QuantumRagdollEditor : QuantumEditor {
+
+    private const float MinSettingValue = 0.001f;
+
+    private const string SettingsPath = nameof(QuantumRagdoll.Settings) + ".";
+    private const string LimbThicknessPropertyPath = SettingsPath + nameof(QuantumRagdoll.RagdollParameters._limbThickness);
+    private const string JointDistancePropertyPath = SettingsPath + nameof(QuantumRagdoll.RagdollParameters._jointDistance);
+    private const string HeadSizePropertyPath = SettingsPath + nameof(QuantumRagdoll.RagdollParameters._headSize);
+    private const string HeadDistancePropertyPath = SettingsPath + nameof(QuantumRagdoll.RagdollParameters._headDistance);
+    private const string ChestThicknessPropertyPath = SettingsPath + nameof(QuantumRagdoll.RagdollParameters._chestThickness);
+    private const string ChestForwardOffsetPropertyPath = SettingsPath + nameof(QuantumRagdoll.RagdollParameters._chestForwardOffset);
+    private const string BellyThicknessPropertyPath = SettingsPath + nameof(QuantumRagdoll.RagdollParameters._bellyThickness);
+    private const string BellyForwardOffsetPropertyPath = SettingsPath + nameof(QuantumRagdoll.RagdollParameters._bellyForwardOffset);
+
+    private static readonly CapsuleBoundsHandle CapsuleHandle = new CapsuleBoundsHandle();
+    private static readonly SphereBoundsHandle SphereHandle = new SphereBoundsHandle();
+
+    private static Color HandlesColor => QuantumGameGizmosSettingsScriptableObject.Global.Settings.DynamicColliders.Color;
+
+    private static GUIContent[] _editCollidersContent;
+
+    private bool _editColliders;
+    private bool _toolsPreviousState;
+
+    protected override void OnEnable() {
+      base.OnEnable();
+      _toolsPreviousState = Tools.hidden;
+    }
+
+    protected override void OnDisable() {
+      base.OnDisable();
+      Tools.hidden = _toolsPreviousState;
+    }
+
+    protected virtual void OnSceneGUI() {
+      if (Application.isPlaying) {
+        return;
+      }
+
+      if (_editColliders && Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape) {
+        _editColliders = false;
+        Tools.hidden = _toolsPreviousState;
+        Repaint();
+      }
+
+      if (_editColliders == false) {
+        return;
+      }
+
+      var ragdoll = (QuantumRagdoll)target;
+      var settings = ragdoll.Settings;
+
+      using (var so = new SerializedObject(ragdoll)) {
+        var limbThickness = so.FindPropertyOrThrow(LimbThicknessPropertyPath);
+        var jointDistance = so.FindPropertyOrThrow(JointDistancePropertyPath);
+        var headSize = so.FindPropertyOrThrow(HeadSizePropertyPath);
+
+        var changed = false;
+        changed |= DrawLimbHandles(settings._leftArm, limbThickness, jointDistance);
+        changed |= DrawLimbHandles(settings._leftElbow, limbThickness, jointDistance);
+        changed |= DrawLimbHandles(settings._rightArm, limbThickness, jointDistance);
+        changed |= DrawLimbHandles(settings._rightElbow, limbThickness, jointDistance);
+        changed |= DrawLimbHandles(settings._leftLeg, limbThickness, jointDistance);
+        changed |= DrawLimbHandles(settings._leftKnee, limbThickness, jointDistance);
+        changed |= DrawLimbHandles(settings._rightLeg, limbThickness, jointDistance);
+        changed |= DrawLimbHandles(settings._rightKnee, limbThickness, jointDistance);
+
+        changed |= DrawHeadSizeHandle(settings._head, headSize);
+        changed |= DrawHeadDistanceHandle(settings._head, so.FindPropertyOrThrow(HeadDistancePropertyPath), headSize);
+
+        // increasing the forward offset moves the chest and the hips boxes towards the bone's local forward
+        changed |= DrawBoxForwardExtentHandle(settings._chest, so.FindPropertyOrThrow(ChestThicknessPropertyPath),
+          so.FindPropertyOrThrow(ChestForwardOffsetPropertyPath), limbThickness);
+        changed |= DrawBoxForwardExtentHandle(settings._hip, so.FindPropertyOrThrow(BellyThicknessPropertyPath),
+          so.FindPropertyOrThrow(BellyForwardOffsetPropertyPath), limbThickness);
+
+        if (changed) {
+          // applying through the serialized object records the undo and triggers OnValidate,
+          // which re-bakes the limb colliders according to the auto bake mode
+          so.ApplyModifiedProperties();
+        }
+      }
+    }
+
+    public override void OnInspectorGUI() {
+      PrepareOnInspectorGUI();
+
+      serializedObject.UpdateIfRequiredOrScript();
+
+      // draws the default inspector properties, inserting the edit colliders toggle before the settings field
+      var property = serializedObject.GetIterator();
+      for (var enterChildren = true; property.NextVisible(enterChildren); enterChildren = false) {
+        if (property.propertyPath == nameof(QuantumRagdoll.Settings)) {
+          DrawEditCollidersToggle();
+        }
+
+        using (new EditorGUI.DisabledScope(property.propertyPath == "m_Script")) {
+          EditorGUILayout.PropertyField(property, true);
+        }
+      }
+
+      serializedObject.ApplyModifiedProperties();
+
+      DrawEditorButtons();
+
+      if (serializedObject.isEditingMultipleObjects || Application.isPlaying) {
+        return;
+      }
+
+      DrawLimbOverridesSection((QuantumRagdoll)target);
+    }
+
+    private void DrawEditCollidersToggle() {
+      if (_editCollidersContent == null) {
+        _editCollidersContent = new[] { EditorGUIUtility.IconContent("d_EditCollider", "Edit the ragdoll colliders in the scene view.") };
+      }
+
+      const float labelWidth = 100f;
+      const float spacing = 5f;
+
+      var position = EditorGUILayout.GetControlRect();
+      var toolbarWidth = GUI.skin.button.CalcSize(_editCollidersContent[0]).x;
+
+      EditorGUI.PrefixLabel(new Rect(position.x, position.y, labelWidth, position.height), new GUIContent("Edit Colliders"));
+
+      var remainingWidth = position.width - labelWidth - spacing;
+      var toolbarRect = new Rect(position.x + labelWidth + spacing + ((remainingWidth - toolbarWidth) / 2), position.y, toolbarWidth, EditorStyles.toolbar.fixedHeight);
+
+      var previousIndex = _editColliders ? 0 : -1;
+
+      EditorGUI.BeginChangeCheck();
+      var index = GUI.Toolbar(toolbarRect, previousIndex, _editCollidersContent, "AppCommand");
+
+      if (EditorGUI.EndChangeCheck()) {
+        // clicking the active button again toggles the edit mode off
+        _editColliders = index != previousIndex;
+        QuantumColliderHandles.RepaintSceneView();
+      }
+
+      Tools.hidden = _editColliders ? true : _toolsPreviousState;
+    }
+
+    private static void DrawLimbOverridesSection(QuantumRagdoll ragdoll) {
+      var settings = ragdoll.Settings;
+      var parts = new (string Label, Transform Bone)[] {
+        ("Hips", settings._hip),
+        ("Chest", settings._chest),
+        ("Head", settings._head),
+        ("Left Arm", settings._leftArm),
+        ("Left Elbow", settings._leftElbow),
+        ("Right Arm", settings._rightArm),
+        ("Right Elbow", settings._rightElbow),
+        ("Left Leg", settings._leftLeg),
+        ("Left Knee", settings._leftKnee),
+        ("Right Leg", settings._rightLeg),
+        ("Right Knee", settings._rightKnee),
+      };
+
+      var views = new List<QuantumRagdollLimbView>();
+      var hasHeader = false;
+
+      // only the limbs with captured overrides are listed
+      foreach (var (label, bone) in parts) {
+        if (bone == null || bone.TryGetComponent(out QuantumRagdollLimbView view) == false || view.HasOverrides == false) {
+          continue;
+        }
+
+        if (hasHeader == false) {
+          QuantumEditorGUI.Header("Limb Overrides");
+          hasHeader = true;
+        }
+
+        views.Add(view);
+
+        using (new EditorGUILayout.HorizontalScope()) {
+          EditorGUILayout.LabelField(label, Summarize(view._overrides));
+
+          if (GUILayout.Button("Reset", GUILayout.Width(60))) {
+            ResetOverrides(ragdoll, view);
+          }
+        }
+      }
+
+      if (hasHeader) {
+        if (GUILayout.Button("Reset All Overrides")) {
+          ResetOverrides(ragdoll, views.ToArray());
+        }
+      }
+    }
+
+    private static string Summarize(QuantumRagdollLimbView.LimbOverrides overrides) {
+      if (overrides.IsZero) {
+        return "-";
+      }
+
+      var deltas = new List<string>();
+
+      void Append(string label, FP value) {
+        if (value.RawValue != 0) {
+          deltas.Add(label + " " + value.AsFloat.ToString("+0.###;-0.###", CultureInfo.InvariantCulture));
+        }
+      }
+
+      void AppendVector(string label, FPVector3 value) {
+        if (value != FPVector3.Zero) {
+          deltas.Add(string.Format(CultureInfo.InvariantCulture, "{0} ({1:0.###}, {2:0.###}, {3:0.###})", label, value.X.AsFloat, value.Y.AsFloat, value.Z.AsFloat));
+        }
+      }
+
+      Append("Capsule Radius", overrides.CapsuleRadius);
+      Append("Capsule Height", overrides.CapsuleHeight);
+      Append("Sphere Radius", overrides.SphereRadius);
+      AppendVector("Box Extents", overrides.BoxExtents);
+      AppendVector("Position Offset", overrides.PositionOffset);
+      Append("Mass", overrides.Mass);
+      Append("Drag", overrides.Drag);
+      Append("Angular Drag", overrides.AngularDrag);
+      Append("Twist Lower Angle", overrides.TwistLowerAngle);
+      Append("Twist Upper Angle", overrides.TwistUpperAngle);
+      Append("Swing 1 Angle", overrides.Swing1AngleLimits);
+      Append("Swing 2 Angle", overrides.Swing2AngleLimits);
+
+      return string.Join(", ", deltas);
+    }
+
+    private static void ResetOverrides(QuantumRagdoll ragdoll, params QuantumRagdollLimbView[] views) {
+      var undoObjects = new List<Object> { ragdoll };
+      foreach (var view in views) {
+        undoObjects.Add(view);
+        if (view.TryGetComponent(out QuantumEntityPrototype prototype)) {
+          undoObjects.Add(prototype);
+        }
+        if (view.TryGetComponent(out QPrototypePhysicsJoints3D joints)) {
+          undoObjects.Add(joints);
+        }
+      }
+
+      // complete object snapshots avoid the property-diff undo records that QuantumRagdollOverrideTracker
+      // listens to, so resetting can never be re-captured as new overrides
+      Undo.RegisterCompleteObjectUndo(undoObjects.ToArray(), "Reset Ragdoll Limb Overrides");
+
+      foreach (var view in views) {
+        view._overrides = default;
+        EditorUtility.SetDirty(view);
+      }
+
+      // re-bakes the limbs back to the computed values; adopting is a no-op since the prototypes match the snapshots
+      ragdoll.BuildRagdoll();
+    }
+
+    private static Shape3DConfig GetBakedShape(Transform bone, Shape3DType shapeType) {
+      if (bone == null || bone.TryGetComponent(out QuantumEntityPrototype prototype) == false) {
+        return null;
+      }
+
+      if (prototype.TransformMode != QuantumEntityPrototypeTransformMode.Transform3D || prototype.PhysicsCollider.IsEnabled == false) {
+        return null;
+      }
+
+      var shape = prototype.PhysicsCollider.Shape3D;
+      if (shape == null || shape.ShapeType != shapeType) {
+        return null;
+      }
+
+      return shape;
+    }
+
+    private static QuantumRagdollLimbView.LimbOverrides GetLimbOverrides(Transform bone) {
+      if (bone != null && bone.TryGetComponent(out QuantumRagdollLimbView view)) {
+        return view._overrides;
+      }
+      // all-zero deltas: the handle math degenerates to the settings-only behavior
+      return default;
+    }
+
+    private static bool DrawLimbHandles(Transform limb, SerializedProperty thickness, SerializedProperty jointDistance) {
+      var shape = GetBakedShape(limb, Shape3DType.Capsule);
+      if (shape == null) {
+        return false;
+      }
+
+      var changed = DrawLimbThicknessHandle(limb, shape, thickness);
+      changed |= DrawJointDistanceHandle(limb, shape, jointDistance);
+      return changed;
+    }
+
+    private static bool DrawLimbThicknessHandle(Transform limb, Shape3DConfig shape, SerializedProperty thickness) {
+      var scale = limb.lossyScale;
+      var scaleAbs = new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), Mathf.Abs(scale.z));
+
+      // mirrors how QuantumEntityPrototype scales the capsule shape config when baking the entity
+      float radiusScale;
+      float heightScale;
+
+      switch (shape.CapsuleDirection) {
+        case CapsuleDirection3D.X:
+          CapsuleHandle.heightAxis = CapsuleBoundsHandle.HeightAxis.X;
+          CapsuleHandle.axes = PrimitiveBoundsHandle.Axes.Y | PrimitiveBoundsHandle.Axes.Z;
+          radiusScale = Mathf.Max(scaleAbs.y, scaleAbs.z);
+          heightScale = scaleAbs.x;
+          break;
+        case CapsuleDirection3D.Z:
+          CapsuleHandle.heightAxis = CapsuleBoundsHandle.HeightAxis.Z;
+          CapsuleHandle.axes = PrimitiveBoundsHandle.Axes.X | PrimitiveBoundsHandle.Axes.Y;
+          radiusScale = Mathf.Max(scaleAbs.x, scaleAbs.y);
+          heightScale = scaleAbs.z;
+          break;
+        default:
+          CapsuleHandle.heightAxis = CapsuleBoundsHandle.HeightAxis.Y;
+          CapsuleHandle.axes = PrimitiveBoundsHandle.Axes.X | PrimitiveBoundsHandle.Axes.Z;
+          radiusScale = Mathf.Max(scaleAbs.x, scaleAbs.z);
+          heightScale = scaleAbs.y;
+          break;
+      }
+
+      if (radiusScale <= 0f) {
+        return false;
+      }
+
+      // the radius is displayed from the thickness setting plus the limb's override delta, so the handles of
+      // all limbs give immediate feedback while dragging, also when the auto bake mode is disabled
+      var overrides = GetLimbOverrides(limb);
+      var radius = Mathf.Max(thickness.floatValue + overrides.CapsuleRadius.AsFloat, MinSettingValue) * radiusScale;
+      var extent = Mathf.Max((shape.CapsuleHeight.AsFloat * heightScale / 2.0f) - radius, 0);
+
+      var matrix = Matrix4x4.TRS(
+        limb.TransformPoint(shape.PositionOffset.ToUnityVector3()),
+        limb.rotation * Quaternion.Euler(shape.RotationOffset.ToUnityVector3()),
+        Vector3.one
+      );
+
+      using (new Handles.DrawingScope(HandlesColor, matrix)) {
+        CapsuleHandle.center = Vector3.zero;
+        CapsuleHandle.height = (extent + radius) * 2;
+        CapsuleHandle.radius = radius;
+
+        EditorGUI.BeginChangeCheck();
+        CapsuleHandle.DrawHandle();
+
+        if (EditorGUI.EndChangeCheck()) {
+          thickness.floatValue = Mathf.Max((CapsuleHandle.radius / radiusScale) - overrides.CapsuleRadius.AsFloat, MinSettingValue);
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    private static bool DrawJointDistanceHandle(Transform limb, Shape3DConfig shape, SerializedProperty jointDistance) {
+      // the bake keeps a gap of half the joint distance between the capsule ends and the joints at both extremities,
+      // independent of the bone scale; the baked position offset points from the bone origin towards the capsule
+      // center, which sits halfway to the next joint
+      var capsuleOffset = limb.TransformPoint(shape.PositionOffset.ToUnityVector3()) - limb.position;
+      if (capsuleOffset.sqrMagnitude < 1e-8f) {
+        return false;
+      }
+
+      var direction = capsuleOffset.normalized;
+      var gap = Mathf.Max(jointDistance.floatValue, MinSettingValue) / 2f;
+      var jointsDistance = capsuleOffset.magnitude * 2f;
+      var changed = false;
+
+      using (new Handles.DrawingScope(HandlesColor)) {
+        // one slider at each capsule extremity; both edit the same joint distance setting
+        for (var tip = 0; tip < 2; tip++) {
+          var isNearTip = tip == 0;
+          var tipPosition = limb.position + direction * (isNearTip ? gap : jointsDistance - gap);
+
+          EditorGUI.BeginChangeCheck();
+          var size = HandleUtility.GetHandleSize(tipPosition) * 0.03f;
+          var newTipPosition = Handles.Slider(tipPosition, direction, size, Handles.DotHandleCap, 0f);
+
+          if (EditorGUI.EndChangeCheck()) {
+            var distance = Vector3.Dot(newTipPosition - limb.position, direction);
+            var newGap = isNearTip ? distance : jointsDistance - distance;
+            jointDistance.floatValue = Mathf.Max(newGap * 2f, MinSettingValue);
+            changed = true;
+          }
+        }
+      }
+
+      return changed;
+    }
+
+    private static bool DrawHeadSizeHandle(Transform head, SerializedProperty headSize) {
+      var shape = GetBakedShape(head, Shape3DType.Sphere);
+      if (shape == null) {
+        return false;
+      }
+
+      // mirrors how QuantumEntityPrototype scales the sphere shape config when baking the entity
+      var scale = head.lossyScale;
+      var radiusScale = Mathf.Max(Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y)), Mathf.Abs(scale.z));
+      if (radiusScale <= 0f) {
+        return false;
+      }
+
+      var matrix = Matrix4x4.TRS(
+        head.TransformPoint(shape.PositionOffset.ToUnityVector3()),
+        head.rotation,
+        radiusScale * Vector3.one
+      );
+
+      var overrides = GetLimbOverrides(head);
+
+      using (new Handles.DrawingScope(HandlesColor, matrix)) {
+        SphereHandle.axes = PrimitiveBoundsHandle.Axes.All;
+        SphereHandle.center = Vector3.zero;
+        // displayed from the head size setting plus the head's override delta, giving immediate feedback also
+        // when the auto bake mode is disabled
+        SphereHandle.radius = Mathf.Max(headSize.floatValue + overrides.SphereRadius.AsFloat, MinSettingValue);
+
+        EditorGUI.BeginChangeCheck();
+        SphereHandle.DrawHandle();
+
+        if (EditorGUI.EndChangeCheck()) {
+          headSize.floatValue = Mathf.Max(SphereHandle.radius - overrides.SphereRadius.AsFloat, MinSettingValue);
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    private static bool DrawHeadDistanceHandle(Transform head, SerializedProperty headDistance, SerializedProperty headSize) {
+      var shape = GetBakedShape(head, Shape3DType.Sphere);
+      if (shape == null) {
+        return false;
+      }
+
+      var scale = head.lossyScale;
+      if (scale.y == 0f) {
+        return false;
+      }
+
+      var overrides = GetLimbOverrides(head);
+      var radiusScale = Mathf.Max(Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y)), Mathf.Abs(scale.z));
+      var radius = Mathf.Max(headSize.floatValue + overrides.SphereRadius.AsFloat, MinSettingValue) * radiusScale;
+      var up = head.rotation * Vector3.up;
+
+      // the sphere center is baked at (up * _headDistance) plus the head's position offset override, in the head's
+      // local space; the arrow on top of the sphere drags the center along the bone's up axis
+      var center = head.TransformPoint(overrides.PositionOffset.ToUnityVector3() + Vector3.up * headDistance.floatValue);
+      var arrowPosition = center + up * radius;
+
+      using (new Handles.DrawingScope(HandlesColor)) {
+        EditorGUI.BeginChangeCheck();
+        var newArrowPosition = Handles.Slider(arrowPosition, up);
+
+        if (EditorGUI.EndChangeCheck()) {
+          // the offset override components orthogonal to the up axis cancel in the dot product
+          headDistance.floatValue = ((Vector3.Dot(newArrowPosition - head.position, up) - radius) / scale.y) - overrides.PositionOffset.Y.AsFloat;
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    private static bool DrawBoxForwardExtentHandle(Transform bone, SerializedProperty boxThickness, SerializedProperty forwardOffset, SerializedProperty limbThickness) {
+      var shape = GetBakedShape(bone, Shape3DType.Box);
+      if (shape == null) {
+        return false;
+      }
+
+      var scale = bone.lossyScale;
+      if (scale.z <= 0f) {
+        return false;
+      }
+
+      var rotation = bone.rotation * Quaternion.Euler(shape.RotationOffset.ToUnityVector3());
+      var center = bone.TransformPoint(shape.PositionOffset.ToUnityVector3());
+      var worldExtents = Vector3.Scale(shape.BoxExtents.ToUnityVector3(), new Vector3(Mathf.Abs(scale.x), Mathf.Abs(scale.y), scale.z));
+      var forward = rotation * Vector3.forward;
+      var extentDeltaZ = GetLimbOverrides(bone).BoxExtents.Z.AsFloat;
+
+      using (new Handles.DrawingScope(HandlesColor, Matrix4x4.TRS(center, rotation, Vector3.one))) {
+        Handles.DrawWireCube(Vector3.zero, worldExtents * 2f);
+      }
+
+      var changed = false;
+
+      using (new Handles.DrawingScope(HandlesColor)) {
+        // one slider on each face of the box along the bone's forward axis; dragging a face keeps the opposite one in place
+        for (var faceSign = -1; faceSign <= 1; faceSign += 2) {
+          var facePosition = center + forward * (faceSign * worldExtents.z);
+
+          EditorGUI.BeginChangeCheck();
+          var size = HandleUtility.GetHandleSize(facePosition) * 0.03f;
+          var newFacePosition = Handles.Slider(facePosition, faceSign * forward, size, Handles.DotHandleCap, 0f);
+
+          if (EditorGUI.EndChangeCheck()) {
+            // distance of the dragged face to the box center along the bone's forward, in shape config space
+            var faceOffset = Vector3.Dot(newFacePosition - center, forward) / scale.z;
+            var halfExtent = ((faceSign * faceOffset) + shape.BoxExtents.Z.AsFloat) / 2f;
+
+            // the forward box extent is baked as (_limbThickness + thickness) in shape config units plus the
+            // limb's box extents override, see RagdollParameters.BuildRagDoll and QuantumRagdollLimbView.ApplyBake
+            var newThickness = Mathf.Max(halfExtent - extentDeltaZ - limbThickness.floatValue, MinSettingValue);
+            var newHalfExtent = limbThickness.floatValue + newThickness + extentDeltaZ;
+
+            // shift the forward offset by the half extent change so the face opposite to the dragged one keeps its
+            // position; dragging the back face flips the direction of the offset compensation
+            boxThickness.floatValue = newThickness;
+            forwardOffset.floatValue += faceSign * (newHalfExtent - shape.BoxExtents.Z.AsFloat);
+            changed = true;
+          }
+        }
+      }
+
+      return changed;
+    }
+  }
+
+  [InitializeOnLoad]
+  internal static class QuantumRagdollOverrideTracker {
+
+    static QuantumRagdollOverrideTracker() {
+      Undo.postprocessModifications += OnPostprocessModifications;
+    }
+
+    private static UndoPropertyModification[] OnPostprocessModifications(UndoPropertyModification[] modifications) {
+      foreach (var modification in modifications) {
+        var target = modification.currentValue?.target;
+
+        if (target is QuantumEntityPrototype prototype) {
+          if (TryGetView(prototype, out var view)) {
+            // recorded within the same undo group as the user's edit, so undoing it also restores the overrides
+            Undo.RecordObject(view, "Ragdoll Limb Override");
+            view.AdoptPrototypeEdits(prototype);
+            // continuous edits may not re-trigger this callback, so the next bake adopts the remainder
+            view._hasPendingPrototypeEdits = true;
+            EditorUtility.SetDirty(view);
+          }
+        } else if (target is QPrototypePhysicsJoints3D joints) {
+          if (TryGetView(joints, out var view)) {
+            Undo.RecordObject(view, "Ragdoll Limb Override");
+            view.AdoptJointEdits(joints);
+            view._hasPendingJointEdits = true;
+            EditorUtility.SetDirty(view);
+          }
+        }
+      }
+
+      return modifications;
+    }
+
+    private static bool TryGetView(Component component, out QuantumRagdollLimbView view) {
+      return component.TryGetComponent(out view) && view.Ragdoll != null;
+    }
+  }
+}
+
+
+#endregion
+
+
 #region Assets/Photon/Quantum/Editor/CustomEditors/QuantumRunnerEditor.cs
 
 namespace Quantum.Editor {
@@ -8816,6 +9389,34 @@ namespace Quantum.Editor {
       };
     }
 
+    /// <summary>
+    /// Hash of the serialized addressable settings and group assets. Unlike <see cref="AddressableAssetSettings.currentHash"/>,
+    /// it only changes when the assets are saved, making it deterministic across MPPM instances and editor sessions.
+    /// </summary>
+    public static Hash128 GetAddressablesContentHash() {
+      if (!AddressableAssetSettingsDefaultObject.SettingsExists) {
+        return default;
+      }
+
+      var settings = AddressableAssetSettingsDefaultObject.Settings;
+
+      // group enumeration order differs between MPPM instances, so hash in path order
+      var paths = new List<string>() { AssetDatabase.GetAssetPath(settings) };
+      foreach (var group in settings.groups) {
+        if (group != null) {
+          paths.Add(AssetDatabase.GetAssetPath(group));
+        }
+      }
+      paths.Sort(StringComparer.Ordinal);
+
+      var hash = new Hash128();
+      foreach (var path in paths) {
+        var fileHash = Hash128.Compute(System.IO.File.ReadAllBytes(path));
+        hash.Append(ref fileHash);
+      }
+      return hash;
+    }
+
     internal static AddressableAssetEntry GetAddressableAssetEntry(UnityEngine.Object source) {
       if (source == null || !AssetDatabase.Contains(source)) {
         return null;
@@ -8960,6 +9561,7 @@ namespace Quantum.Editor {
   using System.IO;
   using System.Linq;
   using UnityEditor;
+  using UnityEditor.AssetImporters;
   using UnityEditor.Build;
   using UnityEditor.PackageManager;
   using UnityEngine;
@@ -9061,6 +9663,18 @@ namespace Quantum.Editor {
     public static string GetAssetGuidOrThrow(UnityEngine.Object obj) {
       var assetPath = GetAssetPathOrThrow(obj);
       return GetAssetGuidOrThrow(assetPath);
+    }
+
+    /// <summary>
+    /// Returns the asset path for the given asset GUID or throws an exception if the asset is not found.
+    /// </summary>
+    public static string GetAssetPathOrThrow(GUID assetGuid) {
+      var result = AssetDatabase.GUIDToAssetPath(assetGuid);
+      if (string.IsNullOrEmpty(result)) {
+        throw new ArgumentException($"Asset with Guid {assetGuid} not found");
+      }
+
+      return result;
     }
 
     /// <summary>
@@ -9434,27 +10048,6 @@ namespace Quantum.Editor {
     }
 
     /// <summary>
-    /// Iterates over all assets in the project that match the given search criteria, without
-    /// actually loading them.
-    /// </summary>
-    /// <param name="root">The optional root folder</param>
-    /// <param name="label">The optional label</param>
-    internal static AssetDatabaseEnumerable IterateAssets<T>(string root = null, string label = null) where T : UnityEngine.Object {
-      return IterateAssets(root, label, typeof(T));
-    }
-
-    /// <summary>
-    /// Iterates over all assets in the project that match the given search criteria, without
-    /// actually loading them.
-    /// </summary>
-    /// <param name="root">The optional root folder</param>
-    /// <param name="label">The optional label</param>
-    /// <param name="type">The optional type</param>
-    internal static AssetDatabaseEnumerable IterateAssets(string root = null, string label = null, Type type = null) {
-      return new AssetDatabaseEnumerable(root, label, type);
-    }
-
-    /// <summary>
     /// Checks if given path is read only. This can happen e.g. for non-local and non-embedded packages.
     /// </summary>
     public static bool IsPathWritable(string path) {
@@ -9550,10 +10143,28 @@ namespace Quantum.Editor {
     }
 
     /// <summary>
+    /// Instance-free equivalent of <see cref="UnityEditor.ObjectNames.GetClassName"/>
+    /// </summary>
+    internal static string GetNativeTypeName(Type type) {
+      if (typeof(ScriptedImporter).IsAssignableFrom(type)) {
+        return nameof(ScriptedImporter);
+      }
+
+      if (typeof(MonoBehaviour).IsAssignableFrom(type) || typeof(ScriptableObject).IsAssignableFrom(type)) {
+        return nameof(MonoBehaviour);
+      }
+
+      return type.Name;
+    }
+
+    /// <summary>
     /// Sends out <see cref="QuantumMppmRegisterCustomDependencyCommand"/> command to virtual peers
     /// before calling <see cref="AssetDatabase.RegisterCustomDependency"/>.
     /// </summary>
     public static void RegisterCustomDependencyWithMppmWorkaround(string customDependency, Hash128 hash) {
+      if (QuantumMppm.Status == QuantumMppmStatus.VirtualInstance) {
+        return;
+      }
       QuantumMppm.MainEditor?.Send(new QuantumMppmRegisterCustomDependencyCommand() { DependencyName = customDependency, Hash = hash.ToString(), });
       AssetDatabase.RegisterCustomDependency(customDependency, hash);
     }
@@ -9630,6 +10241,51 @@ namespace Quantum.Editor {
 
     /// <summary/>
     public static bool operator !=(GuidFileId left, GuidFileId right) => !left.Equals(right);
+  }
+}
+
+#endregion
+
+
+#region AssetDatabaseUtils.Enumerator.cs
+
+namespace Quantum.Editor {
+  using System;
+  using System.Collections;
+  using System.Collections.Generic;
+  using System.Linq;
+  using UnityEditor;
+  using UnityEngine;
+
+#if UNITY_6000_3_OR_NEWER
+  using ObjectIdType = UnityEngine.EntityId;
+  using HierarchyIteratorType = UnityEditor.HierarchyIterator;
+#else
+  using ObjectIdType = System.Int32;
+  using HierarchyIteratorType = UnityEditor.HierarchyProperty;
+#endif
+
+  partial class AssetDatabaseUtils {
+    /// <summary>
+    /// Iterates over all assets in the project that match the given search criteria, without
+    /// actually loading them.
+    /// </summary>
+    /// <param name="root">The optional root folder</param>
+    /// <param name="label">The optional label</param>
+    internal static AssetDatabaseEnumerable IterateAssets<T>(string root = null, string label = null) where T : UnityEngine.Object {
+      return IterateAssets(root, label, typeof(T));
+    }
+
+    /// <summary>
+    /// Iterates over all assets in the project that match the given search criteria, without
+    /// actually loading them.
+    /// </summary>
+    /// <param name="root">The optional root folder</param>
+    /// <param name="label">The optional label</param>
+    /// <param name="type">The optional type</param>
+    internal static AssetDatabaseEnumerable IterateAssets(string root = null, string label = null, Type type = null) {
+      return new AssetDatabaseEnumerable(root, label, type);
+    }
   }
 
   /// <summary>
@@ -11295,6 +11951,7 @@ namespace Quantum.Editor {
 namespace Quantum.Editor {
   using System;
   using System.Diagnostics;
+  using System.Reflection;
   using UnityEditor;
   using UnityEngine;
 
@@ -11322,7 +11979,7 @@ namespace Quantum.Editor {
     public QuantumCustomDependency(string name, Func<Hash128?> getter) {
       Name = name;
       _getter = getter;
-      _applyHash = () => Update(true);
+      _applyHash = () => Update(refreshAssetDB: true);
     }
 
     /// <summary>
@@ -11336,6 +11993,9 @@ namespace Quantum.Editor {
     /// </summary>
     /// <param name="forceImmediate"></param>
     public void Refresh(bool forceImmediate = false) {
+      if (QuantumMppm.Status == QuantumMppmStatus.VirtualInstance) {
+        return;
+      }
       if (IsGlobalImmediateRefreshEnabled || forceImmediate || Application.isBatchMode) {
         if (EditorApplication.isUpdating) {
           QuantumEditorLog.WarnImport($"Can't update custom dependencies during Asset import ({Name}), scheduling to OnPostprocessAllAssets");
@@ -11344,24 +12004,29 @@ namespace Quantum.Editor {
         } else if (AssetDatabase.IsAssetImportWorkerProcess()) {
           QuantumEditorLog.ErrorImport($"Can't update custom dependencies in a worker process ({Name})");
         } else {
-          Update(false);
+          Update(refreshAssetDB: true);
         }
       } else {
+        QuantumEditorLog.TraceImport($"Going to update custom dependency in delayCall ({Name})");
         EditorApplication.delayCall -= _applyHash;
         EditorApplication.delayCall += _applyHash;
       }
     }
 
-    void Update(bool delayed) {
+
+    /// <summary/>
+    protected void Update(bool refreshAssetDB) {
       // ReSharper disable once RedundantAssignment
       var sw = Stopwatch.StartNew();
       var hash = _getter();
       if (hash.HasValue) {
-        QuantumEditorLog.TraceImport($"Refreshing {Name} dependency hash: {hash} (delayed: {delayed}), took: {sw.Elapsed}");
+        QuantumEditorLog.TraceImport($"Refreshing {Name} dependency hash: {hash}, took: {sw.Elapsed}");
         AssetDatabaseUtils.RegisterCustomDependencyWithMppmWorkaround(Name, hash.Value);
-        AssetDatabase.Refresh();
+        if (refreshAssetDB) {
+          AssetDatabase.Refresh();
+        }
       } else {
-        QuantumEditorLog.TraceImport($"Not refreshing {Name} dependency hash, returned null (delayed: {delayed})");
+        QuantumEditorLog.TraceImport($"Not refreshing {Name} dependency hash, returned null");
       }
     }
 
@@ -11379,6 +12044,49 @@ namespace Quantum.Editor {
         callbacks?.Invoke();
       }
     }
+
+    [InitializeOnLoadMethod]
+    static void InitializeEager() {
+      if (AssetDatabase.IsAssetImportWorkerProcess()) {
+        return;
+      }
+
+      if (SessionState.GetBool($"QuantumCustomDependency/RegisteredEagerDependencies", false)) {
+        return;
+      }
+
+      SessionState.SetBool($"QuantumCustomDependency/RegisteredEagerDependencies", true);
+
+      foreach (var field in TypeCache.GetFieldsWithAttribute<QuantumCustomDependencyEagerAttribute>()) {
+        Assert.Always(field.FieldType == typeof(QuantumCustomDependency));
+
+        // make sure static constructor has run
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(field.DeclaringType!.TypeHandle);
+
+        var dependency = (QuantumCustomDependency)field.GetValue(null);
+        Assert.Always(dependency != null);
+
+        dependency.Update(refreshAssetDB: false);
+      }
+    }
+  }
+}
+
+#endregion
+
+
+#region QuantumCustomDependencyEagerAttribute.cs
+
+namespace Quantum.Editor {
+  using System;
+
+  /// <summary>
+  /// If added to a <see cref="QuantumCustomDependency"/> field, the dependency will be calculated
+  /// on the first InitializeOnLoad, but without AssetDatabase.Refresh. This is to avoid refreshing
+  /// assets due to initial 0 value of the dependency hash.
+  /// </summary>
+  [AttributeUsage(AttributeTargets.Field)]
+  public class QuantumCustomDependencyEagerAttribute : Attribute {
   }
 }
 
@@ -12844,11 +13552,7 @@ namespace Quantum.Editor {
     }
 
     private static QuantumGlobalScriptableObjectAttribute GetAttributeOrThrow(Type type) {
-      var attribute = type.GetCustomAttribute<QuantumGlobalScriptableObjectAttribute>();
-      if (attribute == null) {
-        throw new InvalidOperationException($"Type {type.FullName} needs to be decorated with {nameof(QuantumGlobalScriptableObjectAttribute)}");
-      }
-
+      var attribute = type.GetCustomAttribute<QuantumGlobalScriptableObjectAttribute>() ?? throw new InvalidOperationException($"Type {type.FullName} needs to be decorated with {nameof(QuantumGlobalScriptableObjectAttribute)}");
       return attribute;
     }
 
@@ -12884,7 +13588,7 @@ namespace Quantum.Editor {
 
     private static QuantumGlobalScriptableObject CreateDefaultAsset(Type type) {
       var attribute = GetAttributeOrThrow(type);
-      
+
       var directoryPath = Path.GetDirectoryName(attribute.DefaultPath);
       if (!string.IsNullOrEmpty(directoryPath) && !Directory.Exists(directoryPath)) {
         Directory.CreateDirectory(directoryPath);
@@ -13102,7 +13806,9 @@ namespace Quantum.Editor {
       }
     }
 
-    class PostProcessor : AssetPostprocessor {
+
+    internal class PostProcessor : AssetPostprocessor {
+
       static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths) {
         // clean up the path mapping
         _cache.InvalidatePaths(importedAssets, true);
@@ -14702,67 +15408,67 @@ namespace Quantum.Editor {
 
           switch (p.propertyType) {
             case SerializedPropertyType.Integer:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.intValue);
+              hashCode = HashCode.Combine(hashCode, p.intValue);
               break;
             case SerializedPropertyType.Boolean:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.boolValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.boolValue.GetHashCode());
               break;
             case SerializedPropertyType.Float:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.floatValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.floatValue.GetHashCode());
               break;
             case SerializedPropertyType.String:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.stringValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.stringValue.GetHashCode());
               break;
             case SerializedPropertyType.Color:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.colorValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.colorValue.GetHashCode());
               break;
             case SerializedPropertyType.ObjectReference:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.GetObjectReferenceValue().GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.GetObjectReferenceValue().GetHashCode());
               break;
             case SerializedPropertyType.LayerMask:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.intValue);
+              hashCode = HashCode.Combine(hashCode, p.intValue);
               break;
             case SerializedPropertyType.Enum:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.intValue);
+              hashCode = HashCode.Combine(hashCode, p.intValue);
               break;
             case SerializedPropertyType.Vector2:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.vector2Value.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.vector2Value.GetHashCode());
               break;
             case SerializedPropertyType.Vector3:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.vector3Value.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.vector3Value.GetHashCode());
               break;
             case SerializedPropertyType.Vector4:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.vector4Value.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.vector4Value.GetHashCode());
               break;
             case SerializedPropertyType.Vector2Int:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.vector2IntValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.vector2IntValue.GetHashCode());
               break;
             case SerializedPropertyType.Vector3Int:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.vector3IntValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.vector3IntValue.GetHashCode());
               break;
             case SerializedPropertyType.Rect:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.rectValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.rectValue.GetHashCode());
               break;
             case SerializedPropertyType.RectInt:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.rectIntValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.rectIntValue.GetHashCode());
               break;
             case SerializedPropertyType.ArraySize:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.intValue);
+              hashCode = HashCode.Combine(hashCode, p.intValue);
               break;
             case SerializedPropertyType.Character:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.intValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.intValue.GetHashCode());
               break;
             case SerializedPropertyType.AnimationCurve:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.animationCurveValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.animationCurveValue.GetHashCode());
               break;
             case SerializedPropertyType.Bounds:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.boundsValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.boundsValue.GetHashCode());
               break;
             case SerializedPropertyType.BoundsInt:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.boundsIntValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.boundsIntValue.GetHashCode());
               break;
             case SerializedPropertyType.ExposedReference:
-              hashCode = HashCodeUtilities.CombineHashCodes(hashCode, p.exposedReferenceValue.GetHashCode());
+              hashCode = HashCode.Combine(hashCode, p.exposedReferenceValue.GetHashCode());
               break;
             default: {
               enterChildren = true;
@@ -14903,553 +15609,6 @@ namespace Quantum.Editor {
     }
   }
 }
-
-#endregion
-
-
-#region UnityInternal.cs
-
-// ReSharper disable InconsistentNaming
-#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-namespace Quantum.Editor {
-  using System;
-  using System.Collections;
-  using System.Collections.Generic;
-  using System.Linq;
-  using System.Reflection;
-  using UnityEditor;
-  using UnityEngine;
-  using static ReflectionUtils;
-
-
-  static partial class UnityInternal {
-    
-    [UnityEditor.InitializeOnLoad]
-    public static class AssetDatabase {
-      public delegate bool TryGetAssetFolderInfoDelegate(string path, out bool rootFolder, out bool immutable);
-      public static readonly TryGetAssetFolderInfoDelegate TryGetAssetFolderInfo = typeof(UnityEditor.AssetDatabase).CreateMethodDelegate<TryGetAssetFolderInfoDelegate>(
-#if UNITY_6000_0_OR_NEWER
-        nameof(TryGetAssetFolderInfo)
-#else
-        "GetAssetFolderInfo"
-#endif
-);
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class AssetImporter {
-      public delegate long MakeLocalFileIDWithHashDelegate(int persistentTypeId, string name, long offset);
-      public static readonly MakeLocalFileIDWithHashDelegate MakeLocalFileIDWithHash = typeof(UnityEditor.AssetImporter).CreateMethodDelegate<MakeLocalFileIDWithHashDelegate>(nameof(MakeLocalFileIDWithHash));
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class Event {
-      static readonly StaticAccessor<UnityEngine.Event> s_Current_ = typeof(UnityEngine.Event).CreateStaticFieldAccessor<UnityEngine.Event>(nameof(s_Current));
-      public static UnityEngine.Event s_Current => s_Current_.GetValue();
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class Editor {
-      public delegate bool DoDrawDefaultInspectorDelegate(SerializedObject obj);
-      public delegate void BoolSetterDelegate(UnityEditor.Editor editor, bool value);
-
-      public static readonly DoDrawDefaultInspectorDelegate DoDrawDefaultInspector = typeof(UnityEditor.Editor).CreateMethodDelegate<DoDrawDefaultInspectorDelegate>(nameof(DoDrawDefaultInspector));
-      public static readonly BoolSetterDelegate InternalSetHidden = typeof(UnityEditor.Editor).CreateMethodDelegate<BoolSetterDelegate>(nameof(InternalSetHidden), BindingFlags.NonPublic | BindingFlags.Instance);
-    }
-
-
-    [UnityEditor.InitializeOnLoad]
-    public static class EditorGUI {
-      public delegate string DelayedTextFieldInternalDelegate(Rect position, int id, GUIContent label, string value, string allowedLetters, GUIStyle style);
-      public delegate Rect MultiFieldPrefixLabelDelegate(Rect totalPosition, int id, GUIContent label, int columns);
-      public delegate string TextFieldInternalDelegate(int id, Rect position, string text, GUIStyle style);
-      public delegate string ToolbarSearchFieldDelegate(int id, Rect position, string text, bool showWithPopupArrow);
-      public delegate bool DefaultPropertyFieldDelegate(Rect position, UnityEditor.SerializedProperty property, GUIContent label);
-
-
-      public static readonly MultiFieldPrefixLabelDelegate MultiFieldPrefixLabel = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<MultiFieldPrefixLabelDelegate>(nameof(MultiFieldPrefixLabel));
-      public static readonly TextFieldInternalDelegate TextFieldInternal = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<TextFieldInternalDelegate>(nameof(TextFieldInternal));
-      public static readonly ToolbarSearchFieldDelegate ToolbarSearchField = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<ToolbarSearchFieldDelegate>(nameof(ToolbarSearchField));
-      public static readonly DelayedTextFieldInternalDelegate DelayedTextFieldInternal = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<DelayedTextFieldInternalDelegate>(nameof(DelayedTextFieldInternal));
-      public static readonly DefaultPropertyFieldDelegate DefaultPropertyField = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<DefaultPropertyFieldDelegate>(nameof(DefaultPropertyField));
-
-      private static readonly FieldInfo s_TextFieldHash = typeof(UnityEditor.EditorGUI).GetFieldOrThrow(nameof(s_TextFieldHash));
-      private static readonly FieldInfo s_DelayedTextFieldHash = typeof(UnityEditor.EditorGUI).GetFieldOrThrow(nameof(s_DelayedTextFieldHash));
-      private static readonly StaticAccessor<float> s_indent = typeof(UnityEditor.EditorGUI).CreateStaticPropertyAccessor<float>(nameof(indent));
-      public static readonly Action EndEditingActiveTextField = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<Action>(nameof(EndEditingActiveTextField));
-
-      public static int TextFieldHash => (int)s_TextFieldHash.GetValue(null);
-      public static int DelayedTextFieldHash => (int)s_DelayedTextFieldHash.GetValue(null);
-      internal static float indent => s_indent.GetValue();
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class EditorUtility {
-      public delegate void DisplayCustomMenuDelegate(Rect position, string[] options, int[] selected, UnityEditor.EditorUtility.SelectMenuItemFunction callback, object userData);
-
-      public static DisplayCustomMenuDelegate DisplayCustomMenu = typeof(UnityEditor.EditorUtility).CreateMethodDelegate<DisplayCustomMenuDelegate>(nameof(DisplayCustomMenu), BindingFlags.NonPublic | BindingFlags.Static);
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class GUIClip {
-      public static Type InternalType = typeof(UnityEngine.GUIUtility).Assembly.GetType("UnityEngine.GUIClip", true);
-
-      private static readonly StaticAccessor<Rect> _visibleRect = InternalType.CreateStaticPropertyAccessor<Rect>(nameof(visibleRect));
-      public static Rect visibleRect => _visibleRect.GetValue();
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class HandleUtility {
-      public static readonly Action ApplyWireMaterial = typeof(UnityEditor.HandleUtility).CreateMethodDelegate<Action>(nameof(ApplyWireMaterial));
-    }
-
-
-    [UnityEditor.InitializeOnLoad]
-    public static class LayerMatrixGUI {
-      private const string TypeName =
-#if UNITY_2023_1_OR_NEWER
-        "UnityEditor.LayerCollisionMatrixGUI2D";
-#else
-        "UnityEditor.LayerMatrixGUI";
-#endif
-
-      private static readonly Type InternalType =
-#if UNITY_2023_1_OR_NEWER
-        FindAssembly("UnityEditor.Physics2DModule")?.GetType(TypeName, true);
-#else 
-        typeof(UnityEditor.Editor).Assembly.GetType(TypeName, true);
-#endif
-
-      private static readonly Type InternalGetValueFuncType = InternalType?.GetNestedTypeOrThrow(nameof(GetValueFunc), BindingFlags.Public);
-      private static readonly Type InternalSetValueFuncType = InternalType?.GetNestedTypeOrThrow(nameof(SetValueFunc), BindingFlags.Public);
-
-#if UNITY_2023_1_OR_NEWER
-      private static readonly Delegate _Draw = InternalType?.CreateMethodDelegate(nameof(Draw), BindingFlags.Public | BindingFlags.Static,
-        typeof(Action<,,>).MakeGenericType(
-          typeof(GUIContent), InternalGetValueFuncType, InternalSetValueFuncType)
-      );
-#else
-      private delegate void Ref2Action<T1, T2, T3, T4>(T1 t1, ref T2 t2, T3 t3, T4 t4);
-
-      private static readonly Delegate _DoGUI = InternalType?.CreateMethodDelegate("DoGUI", BindingFlags.Public | BindingFlags.Static,
-        typeof(Ref2Action<,,,>).MakeGenericType(
-          typeof(GUIContent), typeof(bool), InternalGetValueFuncType, InternalSetValueFuncType)
-      );
-#endif
-
-      public delegate bool GetValueFunc(int layerA, int layerB);
-      public delegate void SetValueFunc(int layerA, int layerB, bool val);
-
-      public static void Draw(GUIContent label, GetValueFunc getValue, SetValueFunc setValue) {
-        if (InternalType == null) {
-          throw new InvalidOperationException($"{TypeName} not found");
-        }
-
-        var getter = Delegate.CreateDelegate(InternalGetValueFuncType, getValue.Target, getValue.Method);
-        var setter = Delegate.CreateDelegate(InternalSetValueFuncType, setValue.Target, setValue.Method);
-
-#if UNITY_2023_1_OR_NEWER
-        _Draw.DynamicInvoke(label, getter, setter);
-#else
-        bool show = true;
-        var args = new object[] { label, show, getter, setter };
-        _DoGUI.DynamicInvoke(args);
-#endif
-      }
-    }
-
-
-    [UnityEditor.InitializeOnLoad]
-    public static class DecoratorDrawer {
-      private static InstanceAccessor<PropertyAttribute> m_Attribute = typeof(UnityEditor.DecoratorDrawer).CreateFieldAccessor<PropertyAttribute>(nameof(m_Attribute));
-
-      public static void SetAttribute(UnityEditor.DecoratorDrawer drawer, PropertyAttribute attribute) {
-        m_Attribute.SetValue(drawer, attribute);
-      }
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class PropertyDrawer {
-      private static InstanceAccessor<PropertyAttribute> m_Attribute = typeof(UnityEditor.PropertyDrawer).CreateFieldAccessor<PropertyAttribute>(nameof(m_Attribute));
-      private static InstanceAccessor<FieldInfo> m_FieldInfo = typeof(UnityEditor.PropertyDrawer).CreateFieldAccessor<FieldInfo>(nameof(m_FieldInfo));
-
-      public static void SetAttribute(UnityEditor.PropertyDrawer drawer, PropertyAttribute attribute) {
-        m_Attribute.SetValue(drawer, attribute);
-      }
-
-      public static void SetFieldInfo(UnityEditor.PropertyDrawer drawer, FieldInfo fieldInfo) {
-        m_FieldInfo.SetValue(drawer, fieldInfo);
-      }
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class EditorGUIUtility {
-      private static readonly StaticAccessor<int> s_LastControlID = typeof(UnityEditor.EditorGUIUtility).CreateStaticFieldAccessor<int>(nameof(s_LastControlID));
-
-      private static readonly StaticAccessor<float> _contentWidth = typeof(UnityEditor.EditorGUIUtility).CreateStaticPropertyAccessor<float>(nameof(contextWidth));
-      public static int LastControlID => s_LastControlID.GetValue();
-      public static float contextWidth => _contentWidth.GetValue();
-
-      public delegate UnityEngine.Object GetScriptDelegate(string scriptClass);
-      public delegate Texture2D GetIconForObjectDelegate(UnityEngine.Object obj);
-      public delegate GUIContent TempContentDelegate(string text);
-      public delegate Texture2D GetHelpIconDelegate(MessageType type);
-
-      public static readonly GetScriptDelegate GetScript = typeof(UnityEditor.EditorGUIUtility).CreateMethodDelegate<GetScriptDelegate>(nameof(GetScript));
-      public static readonly GetIconForObjectDelegate GetIconForObject = typeof(UnityEditor.EditorGUIUtility).CreateMethodDelegate<GetIconForObjectDelegate>(nameof(GetIconForObject));
-      public static readonly TempContentDelegate TempContent = typeof(UnityEditor.EditorGUIUtility).CreateMethodDelegate<TempContentDelegate>(nameof(TempContent));
-      public static readonly GetHelpIconDelegate GetHelpIcon = typeof(UnityEditor.EditorGUIUtility).CreateMethodDelegate<GetHelpIconDelegate>(nameof(GetHelpIcon));
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class HierarchyIterator {
-#if UNITY_6000_3_OR_NEWER
-      public delegate void CopySearchFilterFromDelegate(UnityEditor.HierarchyIterator to, UnityEditor.HierarchyIterator from);
-      public static CopySearchFilterFromDelegate CopySearchFilterFrom = typeof(UnityEditor.HierarchyIterator).CreateMethodDelegate<CopySearchFilterFromDelegate>(nameof(CopySearchFilterFrom),
-        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-#else
-      public delegate void CopySearchFilterFromDelegate(UnityEditor.HierarchyProperty to, UnityEditor.HierarchyProperty from);
-      public static CopySearchFilterFromDelegate CopySearchFilterFrom = typeof(UnityEditor.HierarchyProperty).CreateMethodDelegate<CopySearchFilterFromDelegate>(nameof(CopySearchFilterFrom),
-        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-#endif
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class ScriptAttributeUtility {
-
-      public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.ScriptAttributeUtility", true);
-
-      public delegate FieldInfo GetFieldInfoFromPropertyDelegate(UnityEditor.SerializedProperty property, out Type type);
-      public static readonly GetFieldInfoFromPropertyDelegate GetFieldInfoFromProperty =
-        InternalType.CreateMethodDelegate<GetFieldInfoFromPropertyDelegate>(
-          "GetFieldInfoFromProperty",
-          BindingFlags.Static | BindingFlags.NonPublic);
-
-      public delegate Type GetDrawerTypeForTypeDelegate(Type type, bool isManagedReference);
-      public static readonly GetDrawerTypeForTypeDelegate GetDrawerTypeForType =
-        InternalType.CreateMethodDelegate<GetDrawerTypeForTypeDelegate>(
-          "GetDrawerTypeForType",
-          BindingFlags.Static | BindingFlags.NonPublic,
-          null,
-          DelegateSwizzle<Type, bool>.Make((t, b) => t), // post 2023.3
-          DelegateSwizzle<Type, bool>.Make((t, b) => t, (t, b) => (Type[])null, (t, b) => b) // pre 2023.3.23
-        );
-
-      public delegate Type GetDrawerTypeForPropertyAndTypeDelegate(UnityEditor.SerializedProperty property, Type type);
-      public static readonly GetDrawerTypeForPropertyAndTypeDelegate GetDrawerTypeForPropertyAndType =
-        InternalType.CreateMethodDelegate<GetDrawerTypeForPropertyAndTypeDelegate>(
-          "GetDrawerTypeForPropertyAndType",
-          BindingFlags.Static | BindingFlags.NonPublic);
-
-      private static readonly GetHandlerDelegate _GetHandler = InternalType.CreateMethodDelegate<GetHandlerDelegate>("GetHandler", BindingFlags.NonPublic | BindingFlags.Static,
-        MakeFuncType(typeof(UnityEditor.SerializedProperty), PropertyHandler.InternalType)
-      );
-
-      public delegate List<PropertyAttribute> GetFieldAttributesDelegate(FieldInfo field);
-      public static readonly GetFieldAttributesDelegate GetFieldAttributes = InternalType.CreateMethodDelegate<GetFieldAttributesDelegate>(nameof(GetFieldAttributes));
-
-      private static readonly StaticAccessor<object> _propertyHandlerCache = InternalType.CreateStaticPropertyAccessor(nameof(propertyHandlerCache), PropertyHandlerCache.InternalType);
-
-      private static readonly StaticAccessor<object> s_SharedNullHandler = InternalType.CreateStaticFieldAccessor("s_SharedNullHandler", PropertyHandler.InternalType);
-      private static readonly StaticAccessor<object> s_NextHandler = InternalType.CreateStaticFieldAccessor("s_NextHandler", PropertyHandler.InternalType);
-
-      public static PropertyHandlerCache propertyHandlerCache => new() {
-        _instance = _propertyHandlerCache.GetValue()
-      };
-
-      public static PropertyHandler sharedNullHandler => PropertyHandler.Wrap(s_SharedNullHandler.GetValue());
-      public static PropertyHandler nextHandler => PropertyHandler.Wrap(s_NextHandler.GetValue());
-
-      public static PropertyHandler GetHandler(UnityEditor.SerializedProperty property) {
-        return PropertyHandler.Wrap(_GetHandler(property));
-      }
-
-      private delegate object GetHandlerDelegate(UnityEditor.SerializedProperty property);
-    }
-
-    public struct PropertyHandlerCache {
-      [UnityEditor.InitializeOnLoad]
-      private static class Statics {
-        public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.PropertyHandlerCache", true);
-        public static readonly GetPropertyHashDelegate GetPropertyHash = InternalType.CreateMethodDelegate<GetPropertyHashDelegate>(nameof(GetPropertyHash));
-
-        public static readonly GetHandlerDelegate GetHandler = InternalType.CreateMethodDelegate<GetHandlerDelegate>(nameof(GetHandler), BindingFlags.NonPublic | BindingFlags.Instance,
-          MakeFuncType(InternalType, typeof(UnityEditor.SerializedProperty), PropertyHandler.InternalType));
-
-        public static readonly SetHandlerDelegate SetHandler = InternalType.CreateMethodDelegate<SetHandlerDelegate>(nameof(SetHandler), BindingFlags.NonPublic | BindingFlags.Instance,
-          MakeActionType(InternalType, typeof(UnityEditor.SerializedProperty), PropertyHandler.InternalType));
-
-        public static readonly FieldInfo m_PropertyHandlers = InternalType.GetFieldOrThrow(nameof(m_PropertyHandlers));
-      }
-
-      public static Type InternalType => Statics.InternalType;
-
-      public delegate int GetPropertyHashDelegate(UnityEditor.SerializedProperty property);
-
-      public delegate object GetHandlerDelegate(object instance, UnityEditor.SerializedProperty property);
-
-      public delegate void SetHandlerDelegate(object instance, UnityEditor.SerializedProperty property, object handlerInstance);
-
-      public object _instance;
-
-      public PropertyHandler GetHandler(UnityEditor.SerializedProperty property) {
-        return new PropertyHandler {
-          _instance = Statics.GetHandler(_instance, property)
-        };
-      }
-
-      public void SetHandler(UnityEditor.SerializedProperty property, PropertyHandler newHandler) {
-        Statics.SetHandler(_instance, property, newHandler._instance);
-      }
-
-      public IEnumerable<(int, PropertyHandler)> PropertyHandlers {
-        get {
-          var dict = (IDictionary)Statics.m_PropertyHandlers.GetValue(_instance);
-          foreach (DictionaryEntry entry in dict) {
-            yield return ((int)entry.Key, PropertyHandler.Wrap(entry.Value));
-          }
-        }
-      }
-    }
-
-    public struct PropertyHandler : IEquatable<PropertyHandler> {
-      [UnityEditor.InitializeOnLoad]
-      private static class Statics {
-        public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.PropertyHandler", true);
-        public static readonly InstanceAccessor<List<UnityEditor.DecoratorDrawer>> m_DecoratorDrawers = InternalType.CreateFieldAccessor<List<UnityEditor.DecoratorDrawer>>(nameof(m_DecoratorDrawers));
-        public static readonly InstanceAccessor<List<UnityEditor.PropertyDrawer>> m_PropertyDrawers = InternalType.CreateFieldAccessor<List<UnityEditor.PropertyDrawer>>(nameof(m_PropertyDrawers));
-      }
-
-
-      public static Type InternalType => Statics.InternalType;
-
-      public object _instance;
-
-      internal static PropertyHandler Wrap(object instance) {
-        return new() {
-          _instance = instance
-        };
-      }
-
-      public static PropertyHandler New() {
-        return Wrap(Activator.CreateInstance(InternalType));
-      }
-
-      public List<UnityEditor.PropertyDrawer> m_PropertyDrawers {
-        get => Statics.m_PropertyDrawers.GetValue(_instance);
-        set => Statics.m_PropertyDrawers.SetValue(_instance, value);
-      }
-
-      public bool Equals(PropertyHandler other) {
-        return _instance == other._instance;
-      }
-
-      public override int GetHashCode() {
-        return _instance?.GetHashCode() ?? 0;
-      }
-
-      public override bool Equals(object obj) {
-        return obj is PropertyHandler h ? Equals(h) : false;
-      }
-
-      public List<UnityEditor.DecoratorDrawer> decoratorDrawers {
-        get => Statics.m_DecoratorDrawers.GetValue(_instance);
-        set => Statics.m_DecoratorDrawers.SetValue(_instance, value);
-      }
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class EditorApplication {
-      public static readonly Action Internal_CallAssetLabelsHaveChanged = typeof(UnityEditor.EditorApplication).CreateMethodDelegate<Action>(nameof(Internal_CallAssetLabelsHaveChanged));
-    }
-
-    public struct ObjectSelector {
-      [UnityEditor.InitializeOnLoad]
-      private static class Statics {
-        public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.ObjectSelector", true);
-        public static readonly StaticAccessor<bool> _tooltip = InternalType.CreateStaticPropertyAccessor<bool>(nameof(isVisible));
-        public static readonly StaticAccessor<EditorWindow> _get = InternalType.CreateStaticPropertyAccessor<EditorWindow>(nameof(get), InternalType);
-        public static readonly InstanceAccessor<string> _searchFilter = InternalType.CreatePropertyAccessor<string>(nameof(searchFilter));
-      }
-
-      private EditorWindow _instance;
-
-      public static bool isVisible => Statics._tooltip.GetValue();
-
-      public static ObjectSelector get => new() {
-        _instance = Statics._get.GetValue()
-      };
-
-      public string searchFilter {
-        get => Statics._searchFilter.GetValue(_instance);
-        set => Statics._searchFilter.SetValue(_instance, value);
-      }
-
-      private static readonly InstanceAccessor<int> _objectSelectorID = Statics.InternalType.CreateFieldAccessor<int>(nameof(objectSelectorID));
-      public int objectSelectorID => _objectSelectorID.GetValue(_instance);
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public class InspectorWindow {
-      public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.InspectorWindow", true);
-      public static readonly InstanceAccessor<bool> _isLockedAccessor = InternalType.CreatePropertyAccessor<bool>(nameof(isLocked));
-
-      private readonly EditorWindow _instance;
-
-      public InspectorWindow(EditorWindow instance) {
-        if (instance == null) {
-          throw new ArgumentNullException(nameof(instance));
-        }
-
-        _instance = instance;
-      }
-
-      public bool isLocked {
-        get => _isLockedAccessor.GetValue(_instance);
-        set => _isLockedAccessor.SetValue(_instance, value);
-      }
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class SerializedProperty {
-      //public static readonly InstanceAccessor<int> hashCodeForPropertyPath                  = typeof(UnityEditor.SerializedProperty).CreatePropertyAccessor<int>(nameof(hashCodeForPropertyPath));
-      public static readonly InstanceAccessor<int> hashCodeForPropertyPathWithoutArrayIndex = typeof(UnityEditor.SerializedProperty).CreatePropertyAccessor<int>(nameof(hashCodeForPropertyPathWithoutArrayIndex));
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    public static class SplitterGUILayout {
-      public static readonly Action EndHorizontalSplit = CreateMethodDelegate<Action>(typeof(UnityEditor.Editor).Assembly,
-        "UnityEditor.SplitterGUILayout", "EndHorizontalSplit", BindingFlags.Public | BindingFlags.Static
-      );
-
-      public static readonly Action EndVerticalSplit = CreateMethodDelegate<Action>(typeof(UnityEditor.Editor).Assembly,
-        "UnityEditor.SplitterGUILayout", "EndVerticalSplit", BindingFlags.Public | BindingFlags.Static
-      );
-
-      public static void BeginHorizontalSplit(SplitterState splitterState, GUIStyle style, params GUILayoutOption[] options) {
-        _beginHorizontalSplit.DynamicInvoke(splitterState.InternalState, style, options);
-      }
-
-      public static void BeginVerticalSplit(SplitterState splitterState, GUIStyle style, params GUILayoutOption[] options) {
-        _beginVerticalSplit.DynamicInvoke(splitterState.InternalState, style, options);
-      }
-
-      private static readonly Delegate _beginHorizontalSplit = CreateMethodDelegate(typeof(UnityEditor.Editor).Assembly,
-        "UnityEditor.SplitterGUILayout", "BeginHorizontalSplit", BindingFlags.Public | BindingFlags.Static,
-        typeof(Action<,,>).MakeGenericType(SplitterState.InternalType, typeof(GUIStyle), typeof(GUILayoutOption[]))
-      );
-
-      private static readonly Delegate _beginVerticalSplit = CreateMethodDelegate(typeof(UnityEditor.Editor).Assembly,
-        "UnityEditor.SplitterGUILayout", "BeginVerticalSplit", BindingFlags.Public | BindingFlags.Static,
-        typeof(Action<,,>).MakeGenericType(SplitterState.InternalType, typeof(GUIStyle), typeof(GUILayoutOption[]))
-      );
-    }
-
-    [UnityEditor.InitializeOnLoad]
-    [Serializable]
-    public class SplitterState : ISerializationCallbackReceiver {
-
-      public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.SplitterState", true);
-      private static readonly FieldInfo _relativeSizes = InternalType.GetFieldOrThrow("relativeSizes");
-      private static readonly FieldInfo _realSizes = InternalType.GetFieldOrThrow("realSizes");
-      private static readonly FieldInfo _splitSize = InternalType.GetFieldOrThrow("splitSize");
-
-      public string Json = "{}";
-
-      [NonSerialized]
-      public object InternalState = FromRelativeInner(new[] { 1.0f });
-
-      void ISerializationCallbackReceiver.OnAfterDeserialize() {
-        InternalState = JsonUtility.FromJson(Json, InternalType);
-      }
-
-      void ISerializationCallbackReceiver.OnBeforeSerialize() {
-        Json = JsonUtility.ToJson(InternalState);
-      }
-
-      public static SplitterState FromRelative(float[] relativeSizes, int[] minSizes = null, int[] maxSizes = null, int splitSize = 0) {
-        var result = new SplitterState();
-        result.InternalState = FromRelativeInner(relativeSizes, minSizes, maxSizes, splitSize);
-        return result;
-      }
-
-
-      private static object FromRelativeInner(float[] relativeSizes, int[] minSizes = null, int[] maxSizes = null, int splitSize = 0) {
-        return Activator.CreateInstance(InternalType, BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.CreateInstance,
-          null,
-          new object[] { relativeSizes, minSizes, maxSizes, splitSize },
-          null, null);
-      }
-
-      public float[] realSizes => ConvertArray((Array)_realSizes.GetValue(InternalState));
-      public float[] relativeSizes => ConvertArray((Array)_relativeSizes.GetValue(InternalState));
-      public float splitSize => Convert.ToSingle(_splitSize.GetValue(InternalState));
-
-      private static float[] ConvertArray(Array value) {
-        float[] result = new float[value.Length];
-        for (int i = 0; i < value.Length; ++i) {
-          result[i] = Convert.ToSingle(value.GetValue(i));
-        }
-        return result;
-      }
-    }
-
-    [InitializeOnLoad]
-    public class UnityType {
-      public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.UnityType", true);
-
-      static readonly Delegate FindTypeByNameDelegate = InternalType?.CreateMethodDelegate(nameof(FindTypeByName), BindingFlags.Public | BindingFlags.Static,
-        typeof(Func<,>).MakeGenericType(typeof(string), InternalType)
-      );
-
-      static readonly InstanceAccessor<int> PersistentTypeIDAccessor = InternalType.CreatePropertyAccessor<int>(nameof(persistentTypeID));
-
-      readonly object _instance;
-
-      public UnityType(object instance) {
-        _instance = instance ?? throw new ArgumentNullException(nameof(instance));
-      }
-
-      public static UnityType FindTypeByName(string name) {
-        var instance = FindTypeByNameDelegate.DynamicInvoke(name);
-        return instance == null ? null : new UnityType(instance);
-      }
-
-      public int persistentTypeID => PersistentTypeIDAccessor.GetValue(_instance);
-    }
-    
-    public sealed class InternalStyles {
-      public static InternalStyles Instance = new InternalStyles();
-
-      internal LazyGUIStyle InspectorTitlebar => LazyGUIStyle.Create(_ => GetStyle("IN Title"));
-      internal LazyGUIStyle FoldoutTitlebar => LazyGUIStyle.Create(_ => GetStyle("Titlebar Foldout", "Foldout"));
-      internal LazyGUIStyle BoxWithBorders => LazyGUIStyle.Create(_ => GetStyle("OL Box"));
-      internal LazyGUIStyle HierarchyTreeViewLine => LazyGUIStyle.Create(_ => GetStyle("TV Line"));
-      internal LazyGUIStyle HierarchyTreeViewSceneBackground => LazyGUIStyle.Create(_ => GetStyle("SceneTopBarBg", "ProjectBrowserTopBarBg"));
-      internal LazyGUIStyle OptionsButtonStyle => LazyGUIStyle.Create(_ => GetStyle("PaneOptions"));
-      internal LazyGUIStyle AddComponentButton => LazyGUIStyle.Create(_ => GetStyle("AC Button"));
-      internal LazyGUIStyle AnimationEventTooltip => LazyGUIStyle.Create(_ => GetStyle("AnimationEventTooltip"));
-      internal LazyGUIStyle AnimationEventTooltipArrow => LazyGUIStyle.Create(_ => GetStyle("AnimationEventTooltipArrow"));
-
-      private static GUIStyle GetStyle(params string[] names) {
-        var skin = GUI.skin;
-
-        foreach (var name in names) {
-          var result = skin.FindStyle(name);
-          if (result != null) {
-            return result;
-          }
-        }
-
-        throw new ArgumentOutOfRangeException($"Style not found: {string.Join(", ", names)}", nameof(names));
-      }
-    }
-
-    public static InternalStyles Styles => InternalStyles.Instance;
-  }
-}
-#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
-// ReSharper enable InconsistentNaming
 
 #endregion
 
@@ -16532,14 +16691,21 @@ namespace Quantum.Editor {
       var result = new Dictionary<string, AsmDefData>(StringComparer.OrdinalIgnoreCase);
 
       if (types.HasFlag(AsmDefType.Predefined)) {
+        bool allowUnsafeCode =
+#if UNITY_6000_7_OR_NEWER
+          true;
+#else
+          PlayerSettings.allowUnsafeCode;
+#endif
+
         if (types.HasFlag(AsmDefType.Runtime)) {
-          yield return new AssemblyInfo("Assembly-CSharp-firstpass", PlayerSettings.allowUnsafeCode, true);
-          yield return new AssemblyInfo("Assembly-CSharp", PlayerSettings.allowUnsafeCode, true);
+          yield return new AssemblyInfo("Assembly-CSharp-firstpass", allowUnsafeCode, true);
+          yield return new AssemblyInfo("Assembly-CSharp", allowUnsafeCode, true);
         }
 
         if (types.HasFlag(AsmDefType.Editor)) {
-          yield return new AssemblyInfo("Assembly-CSharp-Editor-firstpass", PlayerSettings.allowUnsafeCode, true);
-          yield return new AssemblyInfo("Assembly-CSharp-Editor", PlayerSettings.allowUnsafeCode, true);
+          yield return new AssemblyInfo("Assembly-CSharp-Editor-firstpass", allowUnsafeCode, true);
+          yield return new AssemblyInfo("Assembly-CSharp-Editor", allowUnsafeCode, true);
         }
       }
 
@@ -18089,16 +18255,18 @@ namespace Quantum.Editor {
     protected override void OnGUIInternal(Rect position, SerializedProperty property, GUIContent label) {
       var attribute = (MaxStringByteCountAttribute)this.attribute;
 
-      var encoding = System.Text.Encoding.GetEncoding(attribute.Encoding);
-      var byteCount = encoding.GetByteCount(property.stringValue);
-
       using (new QuantumEditorGUI.PropertyScope(position, label, property)) {
         QuantumEditorGUI.ForwardPropertyField(position, property, label, true);
       }
 
+      DrawByteCountOverlay(position, property.stringValue, attribute.Encoding, attribute.ByteCount);
+    }
+
+    public static void DrawByteCountOverlay(Rect position, string value, string encoding, int maxByteCount) {
+      var byteCount = System.Text.Encoding.GetEncoding(encoding).GetByteCount(value);
       QuantumEditorGUI.Overlay(position, $"({byteCount} B)");
-      if (byteCount > attribute.ByteCount) {
-        QuantumEditorGUI.Decorate(position, $"{attribute.Encoding} string max size ({attribute.ByteCount} B) exceeded: {byteCount} B", MessageType.Error, hasLabel: true);
+      if (byteCount > maxByteCount) {
+        QuantumEditorGUI.Decorate(position, $"{encoding} string max size ({maxByteCount} B) exceeded: {byteCount} B", MessageType.Error, hasLabel: true);
       }
     }
   }
@@ -21502,7 +21670,11 @@ namespace Quantum.Editor {
           if (widget.State.IsDrawn == false) { break; }
 
           window.DrawButtonAction(widget.Icon, widget.Text, widget.Subtext, statusIcon: widget.StatusIcon, callback: () => {
+#if UNITY_6000_6_OR_NEWER
+            UnityEditor.AssetPackage.Package.Import(AssetDatabase.GetAssetPath(widget.Asset.asset), false);
+#else
             AssetDatabase.ImportPackage(AssetDatabase.GetAssetPath(widget.Asset.asset), false);
+#endif
           });
 
           break;
@@ -21597,6 +21769,11 @@ namespace Quantum.Editor {
         case QuantumEditorHubWidgetTypeEnum.Addon:
           if (widget.State.IsDrawn == false) { break; }
           QuantumEditorHubWidgetUpm.DrawAddonWidget(widget.Icon, window.DocumentationIcon, widget.Text, widget.Url, widget.Subtext, statusIcon: widget.GetStatusIcon(window));
+          break;
+
+        case QuantumEditorHubWidgetTypeEnum.DocumentationDownload:
+          if (widget.State.IsDrawn == false) { break; }
+          QuantumEditorHubWidgetDocDownload.DrawWidget(window, widget);
           break;
       }
     }
@@ -22274,6 +22451,794 @@ namespace Quantum.Editor {
 #endregion
 
 
+#region QuantumEditorHubWidgetDocDownload.cs
+
+namespace Quantum.Editor {
+  using System;
+  using System.IO;
+  using System.IO.Compression;
+  using System.Linq;
+  using System.Net.Http;
+  using System.Threading.Tasks;
+  using UnityEditor;
+  using UnityEngine;
+
+  /// <summary>
+  /// Widget to download and update online doc md files.
+  /// </summary>
+  public class QuantumEditorHubWidgetDocDownload {
+    const string DocumentationDownloadDefaultFolderName = "Assets/Photon/Quantum/Documentation~/OnlineDocumentation";
+    const string DocumentationDownloadVersionFileName = "version.txt";
+    const string DocumentationDownloadIndexFileName = "index.md";
+    const string DocumentationDownloadFolderPlayerPrefsKey = "Quantum.Hub.DocumentationDownloadFolder";
+
+    static string _documentationDownloadVersion;
+    static bool _isDownloading;
+    static string _packageZipVersion;
+    static string _packageZipVersionAssetPath;
+    static string _webDocumentationVersion;
+    static string _webDocumentationVersionUrl;
+    static GUIContent _updateButtonContent;
+    static GUIContent _uninstallButtonContent;
+    static GUIContent _openFolderButtonContent;
+    static GUIContent _installFromWebButtonContent;
+    static GUIContent _installFromPackageButtonContent;
+    static GUIStyle _actionRowLabelStyle;
+
+    static GUIContent UpdateButtonContent => _updateButtonContent ??= new GUIContent(EditorGUIUtility.IconContent("Refresh").image, "Download and replace the installed documentation");
+    static GUIContent UninstallButtonContent => _uninstallButtonContent ??= new GUIContent(EditorGUIUtility.IconContent("TreeEditor.Trash").image, "Delete the documentation folder");
+    static GUIContent OpenFolderButtonContent => _openFolderButtonContent ??= new GUIContent(EditorGUIUtility.IconContent("Folder Icon").image, "Open the documentation folder location");
+    static GUIContent InstallFromWebButtonContent => _installFromWebButtonContent ??= new GUIContent(EditorGUIUtility.IconContent("Download-Available").image, "Download and install the documentation from the web");
+    static GUIContent InstallFromPackageButtonContent => _installFromPackageButtonContent ??= new GUIContent(EditorGUIUtility.IconContent("Package Manager").image, "Install the documentation from the bundled zip asset");
+
+    static GUIStyle ActionRowLabelStyle => _actionRowLabelStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleLeft };
+
+    static string ProjectRootPath => Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+
+    /// <summary>
+    /// Resolves the folder saved in player prefs against the project root,
+    /// so a changed editor working directory cannot redirect the path to a wrong directory.
+    /// Without a saved key, falls back to a documentation install found inside the default
+    /// parent folder (e.g. committed to version control by someone else) and saves the key,
+    /// so the widget behaves as if it was installed locally.
+    /// </summary>
+    static bool TryGetSavedFolderPath(out string folderPath) {
+      folderPath = null;
+
+      if (PlayerPrefs.HasKey(DocumentationDownloadFolderPlayerPrefsKey) == false) {
+        // Any direct subfolder with a version file and an index file counts, the folder may have been committed under a different name.
+        // Both files are required, a non-empty folder alone could be stray files.
+        // AssetDatabase cannot be used for this, ~-suffixed folders are not imported.
+        try {
+          var searchRootPath = Path.GetFullPath(Path.Combine(ProjectRootPath, Path.GetDirectoryName(DocumentationDownloadDefaultFolderName)));
+          if (Directory.Exists(searchRootPath)) {
+            foreach (var candidatePath in Directory.EnumerateDirectories(searchRootPath)) {
+              if (File.Exists(Path.Combine(candidatePath, DocumentationDownloadVersionFileName)) &&
+                  File.Exists(Path.Combine(candidatePath, DocumentationDownloadIndexFileName))) {
+                PlayerPrefs.SetString(DocumentationDownloadFolderPlayerPrefsKey, Path.GetRelativePath(ProjectRootPath, candidatePath));
+                folderPath = Path.GetFullPath(candidatePath);
+                return true;
+              }
+            }
+          }
+        } catch {
+          // No fallback when the search fails
+        }
+
+        return false;
+      }
+
+      try {
+        folderPath = Path.GetFullPath(Path.Combine(ProjectRootPath, PlayerPrefs.GetString(DocumentationDownloadFolderPlayerPrefsKey)));
+        return true;
+      } catch {
+        folderPath = null;
+        return false;
+      }
+    }
+
+    internal static void DrawWidget(QuantumEditorHubWindow window, QuantumEditorHubWidget widget) {
+      var iconSize = 32;
+      var iconMargin = 14;
+      var contentButtonsHeight = 42;
+      var contentButtonsSpacing = 8; // between the label and the right edge
+      var contentButtonsInnerSpacing = 2; // between the buttons
+
+      var actionButtonSize = contentButtonsHeight; // same size as the addon widget content buttons
+      var actionRowSpacing = 8;
+
+      var installed = HasDocumentationDownloadContent();
+      var hasWebSource = string.IsNullOrEmpty(widget.Url) == false;
+      var packageAssetPath = widget.Asset.isSet ? AssetDatabase.GetAssetPath(widget.Asset.asset) : null;
+      var hasPackageSource = string.IsNullOrEmpty(packageAssetPath) == false;
+
+      var documentationSubtext = widget.Subtext;
+
+      // Reset the cached version when the folder was deleted outside of the hub
+      string documentationVersion = null;
+      if (installed) {
+        documentationVersion = GetDocumentationDownloadVersion();
+      } else {
+        _documentationDownloadVersion = null;
+      }
+
+      if (string.IsNullOrEmpty(documentationVersion) == false) {
+        // The prefix is white instead of the gray subtext color
+        var installedLine = $"<color=#ffffff><b>Installed:</b></color> {FormatVersionForDisplay(documentationVersion)}";
+        documentationSubtext = string.IsNullOrEmpty(documentationSubtext) ? installedLine : $"{documentationSubtext}\n{installedLine}";
+      }
+
+      var labelContent = new GUIContent(string.IsNullOrEmpty(documentationSubtext)
+        ? "<b>" + widget.Text + "</b>"
+        : string.Format("<b>{0}</b>\n{1}", widget.Text, "<color=#aaaaaa>" + documentationSubtext + "</color>"));
+
+      // Measure the wrapped label height to grow the widget beyond the default single description line.
+      // The open folder and uninstall buttons on the right are only drawn in the installed state.
+      var contentButtonsCount = installed ? 2 : 0;
+      var contentButtonsTotalWidth = contentButtonsCount * contentButtonsHeight + Mathf.Max(0, contentButtonsCount - 1) * contentButtonsInnerSpacing;
+      var labelWidth = window.ContentSize.x - (iconSize + iconMargin * 2) - contentButtonsTotalWidth - contentButtonsSpacing * 2;
+      var labelHeight = Mathf.CeilToInt(GUI.skin.label.CalcHeight(labelContent, labelWidth));
+
+      var headerHeight = Mathf.Max(
+        iconSize + GUI.skin.button.padding.top + GUI.skin.button.padding.bottom,
+        labelHeight + GUI.skin.button.padding.top);
+
+      // The box grows by one row per configured installation source, the spacing after the last row is the bottom padding
+      var actionRowsCount = (hasPackageSource ? 1 : 0) + (hasWebSource ? 1 : 0);
+      var height = headerHeight + actionRowsCount * (actionButtonSize + actionRowSpacing);
+
+      var rect = EditorGUILayout.GetControlRect(false, height, GUILayout.ExpandWidth(true));
+
+      GUIStyle nonInteractiveButtonStyle = new GUIStyle(GUI.skin.button) {
+        hover = GUI.skin.label.normal, // Remove hover effect
+        active = GUI.skin.label.normal, // Remove active effect
+        focused = GUI.skin.label.normal, // Remove focus effect
+        normal = GUI.skin.button.normal // Keep the normal button look
+      };
+
+      // Box background spanning the header and the action rows
+      GUI.Label(rect, GUIContent.none, nonInteractiveButtonStyle);
+
+      var headerRect = new Rect(rect) { height = headerHeight };
+
+      // The icon is rendered in the same size as in the other widgets
+      if (widget.Icon != null) {
+        GUI.DrawTexture(new Rect(rect.x + iconMargin, headerRect.y + (headerHeight - iconSize) / 2, iconSize, iconSize), widget.Icon, ScaleMode.ScaleToFit);
+      }
+
+      var textIndent = iconSize + iconMargin * 2;
+      var headerXMax = rect.xMax - contentButtonsSpacing;
+
+      if (installed) {
+        // Right-aligned icon-only square buttons, like the documentation button of the addon widget
+        var uninstallButtonRect = new Rect(headerRect) {
+          yMin = headerRect.yMin + (headerRect.height - contentButtonsHeight) / 2,
+          xMin = headerRect.xMax - (contentButtonsHeight + contentButtonsSpacing),
+          width = contentButtonsHeight,
+          height = contentButtonsHeight,
+        };
+        var openFolderButtonRect = new Rect(uninstallButtonRect) {
+          x = uninstallButtonRect.x - (contentButtonsHeight + contentButtonsInnerSpacing),
+        };
+
+        headerXMax = openFolderButtonRect.xMin - contentButtonsSpacing;
+
+        if (GUI.Button(openFolderButtonRect, OpenFolderButtonContent)) {
+          OpenDocumentationFolder();
+        }
+
+        using (new EditorGUI.DisabledScope(_isDownloading)) {
+          if (GUI.Button(uninstallButtonRect, UninstallButtonContent)) {
+            EditorApplication.delayCall += UninstallDocumentation;
+          }
+        }
+      }
+
+      // header, pinned to the measured label height so no slack space accumulates before the action rows
+      GUI.Label(new Rect(headerRect) {
+        xMin = rect.xMin + textIndent,
+        xMax = headerXMax,
+        yMin = headerRect.yMin + GUI.skin.button.padding.top,
+      }, labelContent);
+
+      // The action rows are stacked below the header inside the same box
+      var rowY = rect.y + headerHeight;
+      Rect NextRowRect() {
+        var rowRect = new Rect(rect.x, rowY, rect.width, actionButtonSize);
+        rowY += actionButtonSize + actionRowSpacing;
+        return rowRect;
+      }
+
+      // One action row per configured installation source.
+      // The row actions open modal dialogs which must not interrupt the OnGUI layout pass.
+      // The buttons are disabled while a download is running, concurrent delete/extract on the same folder must be blocked.
+      using (new EditorGUI.DisabledScope(_isDownloading)) {
+        if (installed) {
+          if (hasPackageSource) {
+            var packageLabel = GetUpdateRowLabel("package", GetPackageZipVersion(widget), documentationVersion);
+            if (DrawActionRow(NextRowRect(), UpdateButtonContent, packageLabel, textIndent, actionButtonSize)) {
+              EditorApplication.delayCall += () => UpdateDocumentation(widget, fromPackage: true);
+            }
+          }
+
+          if (hasWebSource) {
+            //var webLabel = GetUpdateRowLabel("web", GetWebDocumentationVersion(widget.Url), documentationVersion);
+            var webLabel = GetUpdateRowLabel("web", null, documentationVersion);
+            if (DrawActionRow(NextRowRect(), UpdateButtonContent, webLabel, textIndent, actionButtonSize)) {
+              EditorApplication.delayCall += () => UpdateDocumentation(widget, fromPackage: false);
+            }
+          }
+        } else {
+          if (hasPackageSource) {
+            var packageContent = new GUIContent(InstallFromPackageButtonContent) { tooltip = $"Install the documentation from {packageAssetPath}" };
+            if (DrawActionRow(NextRowRect(), packageContent, "Install from package", textIndent, actionButtonSize)) {
+              EditorApplication.delayCall += () => InstallDocumentation(widget, fromPackage: true);
+            }
+          }
+
+          if (hasWebSource) {
+            var webContent = new GUIContent(InstallFromWebButtonContent) { tooltip = $"Download and install the documentation from {widget.Url}" };
+            if (DrawActionRow(NextRowRect(), webContent, "Install from web", textIndent, actionButtonSize)) {
+              EditorApplication.delayCall += () => InstallDocumentation(widget, fromPackage: false);
+            }
+          }
+        }
+      }
+    }
+
+    /// <summary>
+    /// Draws an icon button with a label to its right, indented to the widget text column. Returns true when the button was clicked.
+    /// </summary>
+    static bool DrawActionRow(Rect rect, GUIContent buttonContent, string label, int indent, int buttonSize) {
+      var buttonRect = new Rect(rect) {
+        xMin = rect.xMin + indent,
+        width = buttonSize,
+        height = buttonSize,
+      };
+
+      var clicked = GUI.Button(buttonRect, buttonContent);
+
+      GUI.Label(new Rect(rect) { xMin = buttonRect.xMax + 10 }, label, ActionRowLabelStyle);
+
+      return clicked;
+    }
+
+    /// <summary>
+    /// Asks the user for a target folder, then installs the documentation from the selected source into it.
+    /// </summary>
+    static async void InstallDocumentation(QuantumEditorHubWidget widget, bool fromPackage) {
+      if (_isDownloading) {
+        return;
+      }
+
+      if (TrySelectFolder(
+        "Select Documentation Folder",
+        DocumentationDownloadFolderPlayerPrefsKey,
+        DocumentationDownloadDefaultFolderName,
+        out var documentationFolderPath)) {
+        _documentationDownloadVersion = null;
+
+        // Never mark the widget complete (AutoComplete: ButtonClicked), the installed state is derived from the folder content
+        // and a completed widget would no longer be drawn, making update/uninstall unreachable.
+        await ExtractDocumentationFromSourceAsync(widget, documentationFolderPath, fromPackage);
+      }
+    }
+
+    /// <summary>
+    /// Fetches the documentation again from the selected source and replaces the content of the saved folder.
+    /// </summary>
+    static async void UpdateDocumentation(QuantumEditorHubWidget widget, bool fromPackage) {
+      if (_isDownloading) {
+        return;
+      }
+
+      if (TryGetSavedFolderPath(out var documentationFolderPath) == false) {
+        return;
+      }
+
+      await ExtractDocumentationFromSourceAsync(widget, documentationFolderPath, fromPackage);
+    }
+
+    /// <summary>
+    /// Opens the documentation folder in the file explorer.
+    /// </summary>
+    static void OpenDocumentationFolder() {
+      if (TryGetSavedFolderPath(out var documentationFolderPath) && Directory.Exists(documentationFolderPath)) {
+        EditorUtility.OpenWithDefaultApp(documentationFolderPath);
+      }
+    }
+
+    /// <summary>
+    /// Deletes the documentation folder and the player prefs key after user confirmation.
+    /// </summary>
+    static void UninstallDocumentation() {
+      if (_isDownloading) {
+        return;
+      }
+
+      // Only the prefs key is deleted when the saved path is invalid
+      TryGetSavedFolderPath(out var documentationFolderPath);
+
+      if (documentationFolderPath != null && Directory.Exists(documentationFolderPath)) {
+        if (EditorUtility.DisplayDialog("Documentation Download",
+              $"Delete the documentation folder?\n{documentationFolderPath}",
+              "Delete", "Cancel") == false) {
+          return;
+        }
+
+        try {
+          Directory.Delete(documentationFolderPath, recursive: true);
+        } catch (Exception e) {
+          EditorUtility.DisplayDialog("Documentation Download", $"Failed to delete the documentation folder:\n{e.Message}", "Ok");
+          return;
+        }
+      }
+
+      PlayerPrefs.DeleteKey(DocumentationDownloadFolderPlayerPrefsKey);
+      _documentationDownloadVersion = null;
+    }
+
+    /// <summary>
+    /// Returns true when the documentation folder was saved to player prefs and it still exists and has content.
+    /// </summary>
+    static bool HasDocumentationDownloadContent() {
+      if (TryGetSavedFolderPath(out var folderPath) == false) {
+        return false;
+      }
+
+      try {
+        return Directory.Exists(folderPath) && Directory.EnumerateFileSystemEntries(folderPath).Any();
+      } catch {
+        return false;
+      }
+    }
+
+    /// <summary>
+    /// Asks the user to select a folder and saves it to player prefs.
+    /// A previously saved folder is used as the initial selection of the dialog.
+    /// Selecting the Assets folder or the project root is denied, a subfolder is required.
+    /// </summary>
+    /// <param name="dialogTitle">Title used for the folder selection dialog and error popups.</param>
+    /// <param name="playerPrefsKey">Player prefs key the selected folder is saved to and read from.</param>
+    /// <param name="defaultFolderName">Folder name suggested by the selection dialog when no folder was saved yet.</param>
+    /// <param name="folderPath">The resulting absolute folder path.</param>
+    static bool TrySelectFolder(string dialogTitle, string playerPrefsKey, string defaultFolderName, out string folderPath) {
+      folderPath = null;
+
+      var projectRootPath = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+
+      var initialFolderPath = Path.Combine(projectRootPath, defaultFolderName);
+      if (PlayerPrefs.HasKey(playerPrefsKey)) {
+        try {
+          initialFolderPath = Path.GetFullPath(Path.Combine(projectRootPath, PlayerPrefs.GetString(playerPrefsKey)));
+        } catch {
+          // Keep the default suggestion when the saved path is invalid
+        }
+      }
+
+      var initialParentPath = Path.GetDirectoryName(initialFolderPath) ?? projectRootPath;
+      var initialFolderName = Path.GetFileName(initialFolderPath);
+      if (string.IsNullOrEmpty(initialFolderName)) {
+        initialFolderName = defaultFolderName;
+      }
+
+      // Pre-create the suggested folder, the native dialog rejects non-existing paths
+      var createdInitialFolder = Directory.Exists(initialFolderPath) == false;
+      if (createdInitialFolder) {
+        Directory.CreateDirectory(initialFolderPath);
+      }
+
+      try {
+        for (; ; ) {
+          var selectedPath = EditorUtility.SaveFolderPanel(dialogTitle, initialParentPath, initialFolderName);
+          if (string.IsNullOrEmpty(selectedPath)) {
+            folderPath = null;
+            return false;
+          }
+
+          folderPath = Path.GetFullPath(selectedPath);
+
+          if (string.Equals(folderPath, Path.GetFullPath(Application.dataPath), StringComparison.OrdinalIgnoreCase) ||
+              string.Equals(folderPath, projectRootPath, StringComparison.OrdinalIgnoreCase)) {
+            if (EditorUtility.DisplayDialog(dialogTitle,
+                  "The files cannot be extracted into the Assets folder or the project root directly. Please create and select a subfolder.",
+                  "Select Another Folder", "Cancel") == false) {
+              folderPath = null;
+              return false;
+            }
+
+            continue;
+          }
+
+          // Require explicit confirmation before an existing non-empty folder gets replaced
+          if (Directory.Exists(folderPath) && Directory.EnumerateFileSystemEntries(folderPath).Any()) {
+            var choice = EditorUtility.DisplayDialogComplex(dialogTitle,
+              $"The selected folder is not empty, its content will be deleted and replaced:\n{folderPath}",
+              "Replace Content", "Cancel", "Select Another Folder");
+
+            if (choice == 1) {
+              folderPath = null;
+              return false;
+            }
+
+            if (choice == 2) {
+              continue;
+            }
+          }
+
+          // Save relative to the project root, the editor working directory cannot be relied on
+          PlayerPrefs.SetString(playerPrefsKey, Path.GetRelativePath(projectRootPath, folderPath));
+          return true;
+        }
+      } finally {
+        if (createdInitialFolder &&
+            string.Equals(folderPath, initialFolderPath, StringComparison.OrdinalIgnoreCase) == false &&
+            Directory.Exists(initialFolderPath) &&
+            Directory.EnumerateFileSystemEntries(initialFolderPath).Any() == false) {
+          Directory.Delete(initialFolderPath);
+        }
+      }
+    }
+
+    /// <summary>
+    /// Extracts the documentation zip into the folder, downloaded from the widget url or read from the widget zip asset.
+    /// </summary>
+    static async Task ExtractDocumentationFromSourceAsync(QuantumEditorHubWidget widget, string folderPath, bool fromPackage) {
+      if (fromPackage) {
+        ExtractDocumentationFromAsset(widget, folderPath);
+      } else {
+        await DownloadAndExtractDocumentationAsync(widget.Url, folderPath);
+      }
+    }
+
+    /// <summary>
+    /// Returns the physical path of the zip asset referenced by the widget, null when no asset is assigned.
+    /// Asset paths are virtual (Assets/ or Packages/, package content resides in Library/PackageCache),
+    /// GetPhysicalPath maps them to the location on disk.
+    /// </summary>
+    static string GetPackageZipPath(QuantumEditorHubWidget widget) {
+      var assetPath = widget.Asset.isSet ? AssetDatabase.GetAssetPath(widget.Asset.asset) : null;
+      if (string.IsNullOrEmpty(assetPath)) {
+        return null;
+      }
+
+      return Path.GetFullPath(Path.Combine(ProjectRootPath, FileUtil.GetPhysicalPath(assetPath)));
+    }
+
+    /// <summary>
+    /// Reads and parses the version file inside the widget zip asset, cached per asset path.
+    /// </summary>
+    static string GetPackageZipVersion(QuantumEditorHubWidget widget) {
+      var assetPath = widget.Asset.isSet ? AssetDatabase.GetAssetPath(widget.Asset.asset) : null;
+      if (string.IsNullOrEmpty(assetPath)) {
+        return null;
+      }
+
+      if (string.Equals(assetPath, _packageZipVersionAssetPath, StringComparison.Ordinal)) {
+        return _packageZipVersion;
+      }
+
+      _packageZipVersionAssetPath = assetPath;
+      _packageZipVersion = null;
+
+      try {
+        using (var stream = File.OpenRead(GetPackageZipPath(widget)))
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Read)) {
+          var entry = archive.GetEntry(DocumentationDownloadVersionFileName);
+          if (entry != null) {
+            using (var reader = new StreamReader(entry.Open())) {
+              _packageZipVersion = ParseDocumentationVersion(reader.ReadToEnd());
+            }
+          }
+        }
+      } catch {
+        // No version shown when the asset cannot be read as a zip
+      }
+
+      return _packageZipVersion;
+    }
+
+    /// <summary>
+    /// Returns the version of the online documentation, fetched once per url in the background.
+    /// Returns null while the fetch is still running, the next repaint picks up the result.
+    /// </summary>
+    static string GetWebDocumentationVersion(string url) {
+      if (string.IsNullOrEmpty(url)) {
+        return null;
+      }
+
+      if (string.Equals(url, _webDocumentationVersionUrl, StringComparison.Ordinal)) {
+        return _webDocumentationVersion;
+      }
+
+      _webDocumentationVersionUrl = url;
+      _webDocumentationVersion = null;
+
+      FetchWebDocumentationVersion(url);
+
+      return null;
+    }
+
+    static async void FetchWebDocumentationVersion(string url) {
+      var version = await FetchWebDocumentationVersionAsync(url);
+
+      // Discard stale responses when the url changed while fetching
+      if (string.Equals(url, _webDocumentationVersionUrl, StringComparison.Ordinal)) {
+        _webDocumentationVersion = version;
+      }
+    }
+
+    /// <summary>
+    /// Fetches the version of the online documentation behind the url.
+    /// TODO: dummy implementation, returns the currently installed version instead of querying the endpoint.
+    /// </summary>
+    static async Task<string> FetchWebDocumentationVersionAsync(string url) {
+      await Task.Delay(100);
+      return GetDocumentationDownloadVersion();
+    }
+
+    /// <summary>
+    /// Reads the zip archive from the widget asset reference and extracts it into the folder.
+    /// </summary>
+    static void ExtractDocumentationFromAsset(QuantumEditorHubWidget widget, string folderPath) {
+      try {
+        var zipPath = GetPackageZipPath(widget);
+        if (zipPath == null) {
+          EditorUtility.DisplayDialog("Documentation Download", "The widget has no zip asset assigned.", "Ok");
+          return;
+        }
+
+        ExtractDocumentationDownload(File.ReadAllBytes(zipPath), folderPath, progressStart: 0.0f);
+      } catch (Exception e) {
+        EditorUtility.DisplayDialog("Documentation Download", $"Failed to extract the documentation:\n{e.Message}", "Ok");
+      } finally {
+        EditorUtility.ClearProgressBar();
+      }
+    }
+
+    /// <summary>
+    /// Downloads the documentation zip archive from the url and extracts it into the folder, showing a progress bar.
+    /// </summary>
+    static async Task DownloadAndExtractDocumentationAsync(string url, string folderPath) {
+      _isDownloading = true;
+
+      try {
+        EditorUtility.DisplayProgressBar("Documentation Download", $"Downloading {url}", 0.0f);
+
+        byte[] zipBytes;
+        using (var client = new HttpClient())
+        using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead)) {
+          response.EnsureSuccessStatusCode();
+
+          var totalBytes = response.Content.Headers.ContentLength ?? -1L;
+
+          using (var contentStream = await response.Content.ReadAsStreamAsync())
+          using (var memoryStream = new MemoryStream()) {
+            var buffer = new byte[81920];
+            var readBytes = 0L;
+            for (; ; ) {
+              var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+              if (read <= 0) {
+                break;
+              }
+
+              memoryStream.Write(buffer, 0, read);
+              readBytes += read;
+
+              // The download fills the first half of the bar, the extraction the second half.
+              // Without a content length the download progress stays indeterminate at 25%.
+              var progress = totalBytes > 0 ? (float)readBytes / totalBytes * 0.5f : 0.25f;
+              EditorUtility.DisplayProgressBar("Documentation Download", $"Downloading {url}", progress);
+            }
+
+            zipBytes = memoryStream.ToArray();
+          }
+        }
+
+        ExtractDocumentationDownload(zipBytes, folderPath);
+      } catch (Exception e) {
+        EditorUtility.DisplayDialog("Documentation Download", $"Failed to download the documentation:\n{e.Message}", "Ok");
+      } finally {
+        _isDownloading = false;
+        EditorUtility.ClearProgressBar();
+      }
+    }
+
+    /// <summary>
+    /// Returns the content of the version file inside the saved documentation folder, empty when not available.
+    /// </summary>
+    static string GetDocumentationDownloadVersion() {
+      if (_documentationDownloadVersion == null) {
+        _documentationDownloadVersion = string.Empty;
+
+        if (TryGetSavedFolderPath(out var folderPath)) {
+          try {
+            var versionFilePath = Path.Combine(folderPath, DocumentationDownloadVersionFileName);
+            if (File.Exists(versionFilePath)) {
+              _documentationDownloadVersion = ParseDocumentationVersion(File.ReadAllText(versionFilePath));
+            }
+          } catch {
+            // Keep the version empty when the file cannot be read
+          }
+        }
+      }
+
+      return _documentationDownloadVersion;
+    }
+
+    /// <summary>
+    /// Builds the update row label: no suffix without a known available version, "(version: ...)" when up to date
+    /// and a highlighted "(new version available: ...)" when the available version is newer than the installed one.
+    /// </summary>
+    static string GetUpdateRowLabel(string sourceName, string availableVersion, string installedVersion) {
+      if (string.IsNullOrEmpty(availableVersion)) {
+        return $"Update from {sourceName}";
+      }
+
+      if (IsVersionNewer(availableVersion, installedVersion)) {
+        return $"Update from {sourceName} (<color=#ffffff><b>new version available</b></color>: {FormatVersionForDisplay(availableVersion)})";
+      }
+
+      return $"Update from {sourceName} (version: {FormatVersionForDisplay(availableVersion)})";
+    }
+
+    /// <summary>
+    /// Converts the leading ISO date of the version to European notation for display, e.g. "2026-08-14" to "14.08.2026".
+    /// The internal version strings stay in ISO format, their dates compare lexicographically.
+    /// </summary>
+    static string FormatVersionForDisplay(string version) {
+      var date = GetVersionDate(version);
+      if (date == null) {
+        return version;
+      }
+
+      var europeanDate = $"{date.Substring(8, 2)}.{date.Substring(5, 2)}.{date.Substring(0, 4)}";
+      return europeanDate + version.Substring(date.Length);
+    }
+
+    /// <summary>
+    /// Returns true when the candidate version is newer than the installed version.
+    /// A different product/version slug counts as newer, otherwise the leading dates
+    /// of the parsed version strings ("{yyyy-MM-dd} {product} {version}") are compared.
+    /// </summary>
+    static bool IsVersionNewer(string candidateVersion, string installedVersion) {
+      if (string.IsNullOrEmpty(candidateVersion) || string.IsNullOrEmpty(installedVersion)) {
+        return false;
+      }
+
+      if (string.Equals(GetVersionSlug(candidateVersion), GetVersionSlug(installedVersion), StringComparison.OrdinalIgnoreCase) == false) {
+        return true;
+      }
+
+      var candidateDate = GetVersionDate(candidateVersion);
+      var installedDate = GetVersionDate(installedVersion);
+
+      if (candidateDate == null || installedDate == null) {
+        return false;
+      }
+
+      // ISO dates sort lexicographically
+      return string.CompareOrdinal(candidateDate, installedDate) > 0;
+    }
+
+    static string GetVersionSlug(string version) {
+      var date = GetVersionDate(version);
+      if (date == null) {
+        return version;
+      }
+
+      return version.Length > date.Length + 1 ? version.Substring(date.Length + 1) : string.Empty;
+    }
+
+    static string GetVersionDate(string version) {
+      if (string.IsNullOrEmpty(version)) {
+        return null;
+      }
+
+      var separatorIndex = version.IndexOf(' ');
+      var firstToken = separatorIndex < 0 ? version : version.Substring(0, separatorIndex);
+
+      // "yyyy-MM-dd"
+      var isDate = firstToken.Length == 10 && firstToken[4] == '-' && firstToken[7] == '-';
+      return isDate ? firstToken : null;
+    }
+
+    /// <summary>
+    /// Parses the version file content ("key: value" lines) into the generated date "{yyyy-MM-dd}", e.g. "2026-08-14".
+    /// Falls back to the first line of the file when the generated key is missing.
+    /// </summary>
+    static string ParseDocumentationVersion(string versionFileContent) {
+      string generated = null;
+
+      var lines = versionFileContent.Split('\n');
+      foreach (var line in lines) {
+        var separatorIndex = line.IndexOf(':');
+        if (separatorIndex <= 0) {
+          continue;
+        }
+
+        if (string.Equals(line.Substring(0, separatorIndex).Trim(), "generated", StringComparison.Ordinal)) {
+          generated = line.Substring(separatorIndex + 1).Trim();
+          break;
+        }
+      }
+
+      if (string.IsNullOrEmpty(generated)) {
+        return lines[0].Trim();
+      }
+
+      return generated.Split('T')[0];
+    }
+
+    /// <summary>
+    /// Extracts the downloaded documentation zip into the folder, deleting and replacing any existing content.
+    /// The zip is extracted into a temporary sibling folder first, so invalid downloads or a failed extraction leave the existing content untouched.
+    /// </summary>
+    static void ExtractDocumentationDownload(byte[] zipBytes, string folderPath, float progressStart = 0.5f) {
+      _documentationDownloadVersion = null;
+
+      var tempFolderPath = folderPath + ".downloading";
+
+      try {
+        if (Directory.Exists(tempFolderPath)) {
+          Directory.Delete(tempFolderPath, recursive: true);
+        }
+
+        Directory.CreateDirectory(tempFolderPath);
+
+        using (var archive = new ZipArchive(new MemoryStream(zipBytes), ZipArchiveMode.Read)) {
+          var entries = archive.Entries;
+          for (var i = 0; i < entries.Count; i++) {
+            var entry = entries[i];
+
+            // Keep updating the bar during the synchronous extraction, otherwise the window goes stale and hides
+            if (i % 25 == 0) {
+              EditorUtility.DisplayProgressBar("Documentation Download", $"Extracting {entry.FullName}", progressStart + (1.0f - progressStart) * i / entries.Count);
+            }
+
+            var destinationPath = Path.GetFullPath(Path.Combine(tempFolderPath, entry.FullName));
+
+            // Guard against entries escaping the target folder
+            if (destinationPath.StartsWith(tempFolderPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) == false &&
+                destinationPath.StartsWith(tempFolderPath + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) == false) {
+              continue;
+            }
+
+            if (string.IsNullOrEmpty(entry.Name)) {
+              // Directory entry
+              Directory.CreateDirectory(destinationPath);
+              continue;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+            entry.ExtractToFile(destinationPath, overwrite: true);
+          }
+        }
+
+        // Only replace the existing content after the complete archive was extracted successfully
+        if (Directory.Exists(folderPath)) {
+          Directory.Delete(folderPath, recursive: true);
+        }
+
+        Directory.Move(tempFolderPath, folderPath);
+      } catch (Exception e) {
+        EditorUtility.DisplayDialog("Documentation Download", $"Failed to extract the documentation:\n{e.Message}", "Ok");
+      } finally {
+        try {
+          if (Directory.Exists(tempFolderPath)) {
+            Directory.Delete(tempFolderPath, recursive: true);
+          }
+        } catch {
+          // Best effort cleanup of the temporary folder
+        }
+      }
+    }
+  }
+}
+
+#endregion
+
+
 #region QuantumEditorHubWidgetType.cs
 
 namespace Quantum.Editor {
@@ -22312,6 +23277,7 @@ namespace Quantum.Editor {
     Image,
     Addon,
     AppIdBoxVoice,
+    DocumentationDownload,
     Custom = 100,
   }
 
@@ -24065,7 +25031,9 @@ namespace Quantum.Editor {
 
       var root = new GameObject("Ragdoll Entity");
       root.AddComponent<QPrototypeEntityGroup>();
-   
+      var prototype = root.GetComponent<QuantumEntityPrototype>();
+      prototype.TransformMode = QuantumEntityPrototypeTransformMode.None;
+
       var head = new GameObject("Head");
       var chest = new GameObject("Chest");
       var hip = new GameObject("Hip");
@@ -24160,7 +25128,7 @@ namespace Quantum.Editor {
         _jointDistance = 0.05f,
         _headSize = 0.4f,
         _headDistance = 0.0f,
-        _totalMass = 70,
+        _totalMass = 20,
         _root = root.transform,
         _chest = chest.transform,
         _hip = hip.transform,
@@ -26976,6 +27944,852 @@ namespace Quantum.Editor {
   }
   
 }
+
+#endregion
+
+
+#region Assets/Photon/Quantum/Editor/QuantumUnityInternal.Common.cs
+
+// merged UnityInternal
+
+#region UnityInternal.AssetDatabase.cs
+
+namespace Quantum.Editor {
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class AssetDatabase {
+      public delegate bool TryGetAssetFolderInfoDelegate(string path, out bool rootFolder, out bool immutable);
+      public static readonly TryGetAssetFolderInfoDelegate TryGetAssetFolderInfo = typeof(UnityEditor.AssetDatabase).CreateMethodDelegate<TryGetAssetFolderInfoDelegate>(
+#if UNITY_6000_0_OR_NEWER
+        nameof(TryGetAssetFolderInfo)
+#else
+        "GetAssetFolderInfo"
+#endif
+);
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.AssetImporter.cs
+
+namespace Quantum.Editor {
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class AssetImporter {
+      public delegate long MakeLocalFileIDWithHashDelegate(int persistentTypeId, string name, long offset);
+      public static readonly MakeLocalFileIDWithHashDelegate MakeLocalFileIDWithHash = typeof(UnityEditor.AssetImporter).CreateMethodDelegate<MakeLocalFileIDWithHashDelegate>(nameof(MakeLocalFileIDWithHash));
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.cs
+
+namespace Quantum.Editor {
+  static partial class UnityInternal {
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.DecoratorDrawer.cs
+
+namespace Quantum.Editor {
+  using UnityEngine;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class DecoratorDrawer {
+      private static InstanceAccessor<PropertyAttribute> m_Attribute = typeof(UnityEditor.DecoratorDrawer).CreateFieldAccessor<PropertyAttribute>(nameof(m_Attribute));
+
+      public static void SetAttribute(UnityEditor.DecoratorDrawer drawer, PropertyAttribute attribute) {
+        m_Attribute.SetValue(drawer, attribute);
+      }
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.Editor.cs
+
+namespace Quantum.Editor {
+  using System.Reflection;
+  using UnityEditor;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class Editor {
+      public delegate bool DoDrawDefaultInspectorDelegate(SerializedObject obj);
+      public delegate void BoolSetterDelegate(UnityEditor.Editor editor, bool value);
+
+      public static readonly DoDrawDefaultInspectorDelegate DoDrawDefaultInspector = typeof(UnityEditor.Editor).CreateMethodDelegate<DoDrawDefaultInspectorDelegate>(nameof(DoDrawDefaultInspector));
+      public static readonly BoolSetterDelegate InternalSetHidden = typeof(UnityEditor.Editor).CreateMethodDelegate<BoolSetterDelegate>(nameof(InternalSetHidden), BindingFlags.NonPublic | BindingFlags.Instance);
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.EditorApplication.cs
+
+namespace Quantum.Editor {
+  using System;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class EditorApplication {
+      public static readonly Action Internal_CallAssetLabelsHaveChanged = typeof(UnityEditor.EditorApplication).CreateMethodDelegate<Action>(nameof(Internal_CallAssetLabelsHaveChanged));
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.EditorGUI.cs
+
+namespace Quantum.Editor {
+  using System;
+  using System.Reflection;
+  using UnityEngine;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class EditorGUI {
+      public delegate string DelayedTextFieldInternalDelegate(Rect position, int id, GUIContent label, string value, string allowedLetters, GUIStyle style);
+      public delegate Rect MultiFieldPrefixLabelDelegate(Rect totalPosition, int id, GUIContent label, int columns);
+      public delegate string TextFieldInternalDelegate(int id, Rect position, string text, GUIStyle style);
+      public delegate string ToolbarSearchFieldDelegate(int id, Rect position, string text, bool showWithPopupArrow);
+      public delegate bool DefaultPropertyFieldDelegate(Rect position, UnityEditor.SerializedProperty property, GUIContent label);
+
+
+      public static readonly MultiFieldPrefixLabelDelegate MultiFieldPrefixLabel = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<MultiFieldPrefixLabelDelegate>(nameof(MultiFieldPrefixLabel));
+      public static readonly TextFieldInternalDelegate TextFieldInternal = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<TextFieldInternalDelegate>(nameof(TextFieldInternal));
+      public static readonly ToolbarSearchFieldDelegate ToolbarSearchField = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<ToolbarSearchFieldDelegate>(nameof(ToolbarSearchField));
+      public static readonly DelayedTextFieldInternalDelegate DelayedTextFieldInternal = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<DelayedTextFieldInternalDelegate>(nameof(DelayedTextFieldInternal));
+      public static readonly DefaultPropertyFieldDelegate DefaultPropertyField = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<DefaultPropertyFieldDelegate>(nameof(DefaultPropertyField));
+
+      private static readonly FieldInfo s_TextFieldHash = typeof(UnityEditor.EditorGUI).GetFieldOrThrow(nameof(s_TextFieldHash));
+      private static readonly FieldInfo s_DelayedTextFieldHash = typeof(UnityEditor.EditorGUI).GetFieldOrThrow(nameof(s_DelayedTextFieldHash));
+      private static readonly StaticAccessor<float> s_indent = typeof(UnityEditor.EditorGUI).CreateStaticPropertyAccessor<float>(nameof(indent));
+      public static readonly Action EndEditingActiveTextField = typeof(UnityEditor.EditorGUI).CreateMethodDelegate<Action>(nameof(EndEditingActiveTextField));
+
+      public static int TextFieldHash => (int)s_TextFieldHash.GetValue(null);
+      public static int DelayedTextFieldHash => (int)s_DelayedTextFieldHash.GetValue(null);
+      internal static float indent => s_indent.GetValue();
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.EditorGUIUtility.cs
+
+namespace Quantum.Editor {
+  using UnityEditor;
+  using UnityEngine;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class EditorGUIUtility {
+      private static readonly StaticAccessor<int> s_LastControlID = typeof(UnityEditor.EditorGUIUtility).CreateStaticFieldAccessor<int>(nameof(s_LastControlID));
+
+      private static readonly StaticAccessor<float> _contentWidth = typeof(UnityEditor.EditorGUIUtility).CreateStaticPropertyAccessor<float>(nameof(contextWidth));
+      public static int LastControlID => s_LastControlID.GetValue();
+      public static float contextWidth => _contentWidth.GetValue();
+
+      public delegate UnityEngine.Object GetScriptDelegate(string scriptClass);
+      public delegate Texture2D GetIconForObjectDelegate(UnityEngine.Object obj);
+      public delegate GUIContent TempContentDelegate(string text);
+      public delegate Texture2D GetHelpIconDelegate(MessageType type);
+
+      public static readonly GetScriptDelegate GetScript = typeof(UnityEditor.EditorGUIUtility).CreateMethodDelegate<GetScriptDelegate>(nameof(GetScript));
+      public static readonly GetIconForObjectDelegate GetIconForObject = typeof(UnityEditor.EditorGUIUtility).CreateMethodDelegate<GetIconForObjectDelegate>(nameof(GetIconForObject));
+      public static readonly TempContentDelegate TempContent = typeof(UnityEditor.EditorGUIUtility).CreateMethodDelegate<TempContentDelegate>(nameof(TempContent));
+      public static readonly GetHelpIconDelegate GetHelpIcon = typeof(UnityEditor.EditorGUIUtility).CreateMethodDelegate<GetHelpIconDelegate>(nameof(GetHelpIcon));
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.EditorUtility.cs
+
+namespace Quantum.Editor {
+  using System.Reflection;
+  using UnityEngine;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class EditorUtility {
+      public delegate void DisplayCustomMenuDelegate(Rect position, string[] options, int[] selected, UnityEditor.EditorUtility.SelectMenuItemFunction callback, object userData);
+
+      public static DisplayCustomMenuDelegate DisplayCustomMenu = typeof(UnityEditor.EditorUtility).CreateMethodDelegate<DisplayCustomMenuDelegate>(nameof(DisplayCustomMenu), BindingFlags.NonPublic | BindingFlags.Static);
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.Event.cs
+
+namespace Quantum.Editor {
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class Event {
+      static readonly StaticAccessor<UnityEngine.Event> s_Current_ = typeof(UnityEngine.Event).CreateStaticFieldAccessor<UnityEngine.Event>(nameof(s_Current));
+      public static UnityEngine.Event s_Current => s_Current_.GetValue();
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.GUIClip.cs
+
+namespace Quantum.Editor {
+  using System;
+  using UnityEngine;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class GUIClip {
+      public static Type InternalType = typeof(UnityEngine.GUIUtility).Assembly.GetType("UnityEngine.GUIClip", true);
+
+      private static readonly StaticAccessor<Rect> _visibleRect = InternalType.CreateStaticPropertyAccessor<Rect>(nameof(visibleRect));
+      public static Rect visibleRect => _visibleRect.GetValue();
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.HandleUtility.cs
+
+namespace Quantum.Editor {
+  using System;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class HandleUtility {
+      public static readonly Action ApplyWireMaterial = typeof(UnityEditor.HandleUtility).CreateMethodDelegate<Action>(nameof(ApplyWireMaterial));
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.HierarchyIterator.cs
+
+namespace Quantum.Editor {
+  using System.Reflection;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class HierarchyIterator {
+#if UNITY_6000_3_OR_NEWER
+      public delegate void CopySearchFilterFromDelegate(UnityEditor.HierarchyIterator to, UnityEditor.HierarchyIterator from);
+      public static CopySearchFilterFromDelegate CopySearchFilterFrom = typeof(UnityEditor.HierarchyIterator).CreateMethodDelegate<CopySearchFilterFromDelegate>(nameof(CopySearchFilterFrom),
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+#else
+      public delegate void CopySearchFilterFromDelegate(UnityEditor.HierarchyProperty to, UnityEditor.HierarchyProperty from);
+      public static CopySearchFilterFromDelegate CopySearchFilterFrom = typeof(UnityEditor.HierarchyProperty).CreateMethodDelegate<CopySearchFilterFromDelegate>(nameof(CopySearchFilterFrom),
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+#endif
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.InspectorWindow.cs
+
+namespace Quantum.Editor {
+  using System;
+  using UnityEditor;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public class InspectorWindow {
+      public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.InspectorWindow", true);
+      public static readonly InstanceAccessor<bool> _isLockedAccessor = InternalType.CreatePropertyAccessor<bool>(nameof(isLocked));
+
+      private readonly EditorWindow _instance;
+
+      public InspectorWindow(EditorWindow instance) {
+        if (instance == null) {
+          throw new ArgumentNullException(nameof(instance));
+        }
+
+        _instance = instance;
+      }
+
+      public bool isLocked {
+        get => _isLockedAccessor.GetValue(_instance);
+        set => _isLockedAccessor.SetValue(_instance, value);
+      }
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.InternalStyles.cs
+
+namespace Quantum.Editor {
+  using System;
+  using UnityEngine;
+
+  partial class UnityInternal {
+    public sealed class InternalStyles {
+      public static InternalStyles Instance = new InternalStyles();
+
+      internal LazyGUIStyle InspectorTitlebar => LazyGUIStyle.Create(_ => GetStyle("IN Title"));
+      internal LazyGUIStyle FoldoutTitlebar => LazyGUIStyle.Create(_ => GetStyle("Titlebar Foldout", "Foldout"));
+      internal LazyGUIStyle BoxWithBorders => LazyGUIStyle.Create(_ => GetStyle("OL Box"));
+      internal LazyGUIStyle HierarchyTreeViewLine => LazyGUIStyle.Create(_ => GetStyle("TV Line"));
+      internal LazyGUIStyle HierarchyTreeViewSceneBackground => LazyGUIStyle.Create(_ => GetStyle("SceneTopBarBg", "ProjectBrowserTopBarBg"));
+      internal LazyGUIStyle OptionsButtonStyle => LazyGUIStyle.Create(_ => GetStyle("PaneOptions"));
+      internal LazyGUIStyle AddComponentButton => LazyGUIStyle.Create(_ => GetStyle("AC Button"));
+      internal LazyGUIStyle AnimationEventTooltip => LazyGUIStyle.Create(_ => GetStyle("AnimationEventTooltip"));
+      internal LazyGUIStyle AnimationEventTooltipArrow => LazyGUIStyle.Create(_ => GetStyle("AnimationEventTooltipArrow"));
+
+      private static GUIStyle GetStyle(params string[] names) {
+        var skin = GUI.skin;
+
+        foreach (var name in names) {
+          var result = skin.FindStyle(name);
+          if (result != null) {
+            return result;
+          }
+        }
+
+        throw new ArgumentOutOfRangeException($"Style not found: {string.Join(", ", names)}", nameof(names));
+      }
+    }
+
+    public static InternalStyles Styles => InternalStyles.Instance;
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.LayerMatrixGUI.cs
+
+namespace Quantum.Editor {
+  using System;
+  using System.Reflection;
+  using UnityEngine;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class LayerMatrixGUI {
+      private const string TypeName =
+#if UNITY_2023_1_OR_NEWER
+        "UnityEditor.LayerCollisionMatrixGUI2D";
+#else
+        "UnityEditor.LayerMatrixGUI";
+#endif
+
+      private static readonly Type InternalType =
+#if UNITY_2023_1_OR_NEWER
+        FindAssembly("UnityEditor.Physics2DModule")?.GetType(TypeName, true);
+#else
+        typeof(UnityEditor.Editor).Assembly.GetType(TypeName, true);
+#endif
+
+      private static readonly Type InternalGetValueFuncType = InternalType?.GetNestedTypeOrThrow(nameof(GetValueFunc), BindingFlags.Public);
+      private static readonly Type InternalSetValueFuncType = InternalType?.GetNestedTypeOrThrow(nameof(SetValueFunc), BindingFlags.Public);
+
+#if UNITY_2023_1_OR_NEWER
+      private static readonly Delegate _Draw = InternalType?.CreateMethodDelegate(nameof(Draw), BindingFlags.Public | BindingFlags.Static,
+        typeof(Action<,,>).MakeGenericType(
+          typeof(GUIContent), InternalGetValueFuncType, InternalSetValueFuncType)
+      );
+#else
+      private delegate void Ref2Action<T1, T2, T3, T4>(T1 t1, ref T2 t2, T3 t3, T4 t4);
+
+      private static readonly Delegate _DoGUI = InternalType?.CreateMethodDelegate("DoGUI", BindingFlags.Public | BindingFlags.Static,
+        typeof(Ref2Action<,,,>).MakeGenericType(
+          typeof(GUIContent), typeof(bool), InternalGetValueFuncType, InternalSetValueFuncType)
+      );
+#endif
+
+      public delegate bool GetValueFunc(int layerA, int layerB);
+      public delegate void SetValueFunc(int layerA, int layerB, bool val);
+
+      public static void Draw(GUIContent label, GetValueFunc getValue, SetValueFunc setValue) {
+        if (InternalType == null) {
+          throw new InvalidOperationException($"{TypeName} not found");
+        }
+
+        var getter = Delegate.CreateDelegate(InternalGetValueFuncType, getValue.Target, getValue.Method);
+        var setter = Delegate.CreateDelegate(InternalSetValueFuncType, setValue.Target, setValue.Method);
+
+#if UNITY_2023_1_OR_NEWER
+        _Draw.DynamicInvoke(label, getter, setter);
+#else
+        bool show = true;
+        var args = new object[] { label, show, getter, setter };
+        _DoGUI.DynamicInvoke(args);
+#endif
+      }
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.ObjectSelector.cs
+
+namespace Quantum.Editor {
+  using System;
+  using UnityEditor;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    public struct ObjectSelector {
+      [UnityEditor.InitializeOnLoad]
+      private static class Statics {
+        public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.ObjectSelector", true);
+        public static readonly StaticAccessor<bool> _tooltip = InternalType.CreateStaticPropertyAccessor<bool>(nameof(isVisible));
+        public static readonly StaticAccessor<EditorWindow> _get = InternalType.CreateStaticPropertyAccessor<EditorWindow>(nameof(get), InternalType);
+        public static readonly InstanceAccessor<string> _searchFilter = InternalType.CreatePropertyAccessor<string>(nameof(searchFilter));
+      }
+
+      private EditorWindow _instance;
+
+      public static bool isVisible => Statics._tooltip.GetValue();
+
+      public static ObjectSelector get => new() {
+        _instance = Statics._get.GetValue()
+      };
+
+      public string searchFilter {
+        get => Statics._searchFilter.GetValue(_instance);
+        set => Statics._searchFilter.SetValue(_instance, value);
+      }
+
+      private static readonly InstanceAccessor<int> _objectSelectorID = Statics.InternalType.CreateFieldAccessor<int>(nameof(objectSelectorID));
+      public int objectSelectorID => _objectSelectorID.GetValue(_instance);
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.PropertyDrawer.cs
+
+namespace Quantum.Editor {
+  using System.Reflection;
+  using UnityEngine;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class PropertyDrawer {
+      private static InstanceAccessor<PropertyAttribute> m_Attribute = typeof(UnityEditor.PropertyDrawer).CreateFieldAccessor<PropertyAttribute>(nameof(m_Attribute));
+      private static InstanceAccessor<FieldInfo> m_FieldInfo = typeof(UnityEditor.PropertyDrawer).CreateFieldAccessor<FieldInfo>(nameof(m_FieldInfo));
+
+      public static void SetAttribute(UnityEditor.PropertyDrawer drawer, PropertyAttribute attribute) {
+        m_Attribute.SetValue(drawer, attribute);
+      }
+
+      public static void SetFieldInfo(UnityEditor.PropertyDrawer drawer, FieldInfo fieldInfo) {
+        m_FieldInfo.SetValue(drawer, fieldInfo);
+      }
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.PropertyHandler.cs
+
+namespace Quantum.Editor {
+  using System;
+  using System.Collections.Generic;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    public struct PropertyHandler : IEquatable<PropertyHandler> {
+      [UnityEditor.InitializeOnLoad]
+      private static class Statics {
+        public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.PropertyHandler", true);
+        public static readonly InstanceAccessor<List<UnityEditor.DecoratorDrawer>> m_DecoratorDrawers = InternalType.CreateFieldAccessor<List<UnityEditor.DecoratorDrawer>>(nameof(m_DecoratorDrawers));
+        public static readonly InstanceAccessor<List<UnityEditor.PropertyDrawer>> m_PropertyDrawers = InternalType.CreateFieldAccessor<List<UnityEditor.PropertyDrawer>>(nameof(m_PropertyDrawers));
+      }
+
+
+      public static Type InternalType => Statics.InternalType;
+
+      public object _instance;
+
+      internal static PropertyHandler Wrap(object instance) {
+        return new() {
+          _instance = instance
+        };
+      }
+
+      public static PropertyHandler New() {
+        return Wrap(Activator.CreateInstance(InternalType));
+      }
+
+      public List<UnityEditor.PropertyDrawer> m_PropertyDrawers {
+        get => Statics.m_PropertyDrawers.GetValue(_instance);
+        set => Statics.m_PropertyDrawers.SetValue(_instance, value);
+      }
+
+      public bool Equals(PropertyHandler other) {
+        return _instance == other._instance;
+      }
+
+      public override int GetHashCode() {
+        return _instance?.GetHashCode() ?? 0;
+      }
+
+      public override bool Equals(object obj) {
+        return obj is PropertyHandler h ? Equals(h) : false;
+      }
+
+      public List<UnityEditor.DecoratorDrawer> decoratorDrawers {
+        get => Statics.m_DecoratorDrawers.GetValue(_instance);
+        set => Statics.m_DecoratorDrawers.SetValue(_instance, value);
+      }
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.PropertyHandlerCache.cs
+
+namespace Quantum.Editor {
+  using System;
+  using System.Collections;
+  using System.Collections.Generic;
+  using System.Reflection;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    public struct PropertyHandlerCache {
+      [UnityEditor.InitializeOnLoad]
+      private static class Statics {
+        public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.PropertyHandlerCache", true);
+        public static readonly GetPropertyHashDelegate GetPropertyHash = InternalType.CreateMethodDelegate<GetPropertyHashDelegate>(nameof(GetPropertyHash));
+
+        public static readonly GetHandlerDelegate GetHandler = InternalType.CreateMethodDelegate<GetHandlerDelegate>(nameof(GetHandler), BindingFlags.NonPublic | BindingFlags.Instance,
+          MakeFuncType(InternalType, typeof(UnityEditor.SerializedProperty), PropertyHandler.InternalType));
+
+        public static readonly SetHandlerDelegate SetHandler = InternalType.CreateMethodDelegate<SetHandlerDelegate>(nameof(SetHandler), BindingFlags.NonPublic | BindingFlags.Instance,
+          MakeActionType(InternalType, typeof(UnityEditor.SerializedProperty), PropertyHandler.InternalType));
+
+        public static readonly FieldInfo m_PropertyHandlers = InternalType.GetFieldOrThrow(nameof(m_PropertyHandlers));
+      }
+
+      public static Type InternalType => Statics.InternalType;
+
+      public delegate int GetPropertyHashDelegate(UnityEditor.SerializedProperty property);
+
+      public delegate object GetHandlerDelegate(object instance, UnityEditor.SerializedProperty property);
+
+      public delegate void SetHandlerDelegate(object instance, UnityEditor.SerializedProperty property, object handlerInstance);
+
+      public object _instance;
+
+      public PropertyHandler GetHandler(UnityEditor.SerializedProperty property) {
+        return new PropertyHandler {
+          _instance = Statics.GetHandler(_instance, property)
+        };
+      }
+
+      public void SetHandler(UnityEditor.SerializedProperty property, PropertyHandler newHandler) {
+        Statics.SetHandler(_instance, property, newHandler._instance);
+      }
+
+      public IEnumerable<(int, PropertyHandler)> PropertyHandlers {
+        get {
+          var dict = (IDictionary)Statics.m_PropertyHandlers.GetValue(_instance);
+          foreach (DictionaryEntry entry in dict) {
+            yield return ((int)entry.Key, PropertyHandler.Wrap(entry.Value));
+          }
+        }
+      }
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.ScriptAttributeUtility.cs
+
+namespace Quantum.Editor {
+  using System;
+  using System.Collections.Generic;
+  using System.Reflection;
+  using UnityEngine;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class ScriptAttributeUtility {
+
+      public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.ScriptAttributeUtility", true);
+
+      public delegate FieldInfo GetFieldInfoFromPropertyDelegate(UnityEditor.SerializedProperty property, out Type type);
+      public static readonly GetFieldInfoFromPropertyDelegate GetFieldInfoFromProperty =
+        InternalType.CreateMethodDelegate<GetFieldInfoFromPropertyDelegate>(
+          "GetFieldInfoFromProperty",
+          BindingFlags.Static | BindingFlags.NonPublic);
+
+      public delegate Type GetDrawerTypeForTypeDelegate(Type type, bool isManagedReference);
+      public static readonly GetDrawerTypeForTypeDelegate GetDrawerTypeForType =
+        InternalType.CreateMethodDelegate<GetDrawerTypeForTypeDelegate>(
+          "GetDrawerTypeForType",
+          BindingFlags.Static | BindingFlags.NonPublic,
+          null,
+          DelegateSwizzle<Type, bool>.Make((t, b) => t), // post 2023.3
+          DelegateSwizzle<Type, bool>.Make((t, b) => t, (t, b) => (Type[])null, (t, b) => b) // pre 2023.3.23
+        );
+
+      public delegate Type GetDrawerTypeForPropertyAndTypeDelegate(UnityEditor.SerializedProperty property, Type type);
+      public static readonly GetDrawerTypeForPropertyAndTypeDelegate GetDrawerTypeForPropertyAndType =
+        InternalType.CreateMethodDelegate<GetDrawerTypeForPropertyAndTypeDelegate>(
+          "GetDrawerTypeForPropertyAndType",
+          BindingFlags.Static | BindingFlags.NonPublic);
+
+      private static readonly GetHandlerDelegate _GetHandler = InternalType.CreateMethodDelegate<GetHandlerDelegate>("GetHandler", BindingFlags.NonPublic | BindingFlags.Static,
+        MakeFuncType(typeof(UnityEditor.SerializedProperty), PropertyHandler.InternalType)
+      );
+
+      public delegate List<PropertyAttribute> GetFieldAttributesDelegate(FieldInfo field);
+      public static readonly GetFieldAttributesDelegate GetFieldAttributes = InternalType.CreateMethodDelegate<GetFieldAttributesDelegate>(nameof(GetFieldAttributes));
+
+      private static readonly StaticAccessor<object> _propertyHandlerCache = InternalType.CreateStaticPropertyAccessor(nameof(propertyHandlerCache), PropertyHandlerCache.InternalType);
+
+      private static readonly StaticAccessor<object> s_SharedNullHandler = InternalType.CreateStaticFieldAccessor("s_SharedNullHandler", PropertyHandler.InternalType);
+      private static readonly StaticAccessor<object> s_NextHandler = InternalType.CreateStaticFieldAccessor("s_NextHandler", PropertyHandler.InternalType);
+
+      public static PropertyHandlerCache propertyHandlerCache => new() {
+        _instance = _propertyHandlerCache.GetValue()
+      };
+
+      public static PropertyHandler sharedNullHandler => PropertyHandler.Wrap(s_SharedNullHandler.GetValue());
+      public static PropertyHandler nextHandler => PropertyHandler.Wrap(s_NextHandler.GetValue());
+
+      public static PropertyHandler GetHandler(UnityEditor.SerializedProperty property) {
+        return PropertyHandler.Wrap(_GetHandler(property));
+      }
+
+      private delegate object GetHandlerDelegate(UnityEditor.SerializedProperty property);
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.SerializedProperty.cs
+
+namespace Quantum.Editor {
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class SerializedProperty {
+      //public static readonly InstanceAccessor<int> hashCodeForPropertyPath                  = typeof(UnityEditor.SerializedProperty).CreatePropertyAccessor<int>(nameof(hashCodeForPropertyPath));
+      public static readonly InstanceAccessor<int> hashCodeForPropertyPathWithoutArrayIndex = typeof(UnityEditor.SerializedProperty).CreatePropertyAccessor<int>(nameof(hashCodeForPropertyPathWithoutArrayIndex));
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.SplitterGUILayout.cs
+
+namespace Quantum.Editor {
+  using System;
+  using System.Reflection;
+  using UnityEngine;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    public static class SplitterGUILayout {
+      public static readonly Action EndHorizontalSplit = CreateMethodDelegate<Action>(typeof(UnityEditor.Editor).Assembly,
+        "UnityEditor.SplitterGUILayout", "EndHorizontalSplit", BindingFlags.Public | BindingFlags.Static
+      );
+
+      public static readonly Action EndVerticalSplit = CreateMethodDelegate<Action>(typeof(UnityEditor.Editor).Assembly,
+        "UnityEditor.SplitterGUILayout", "EndVerticalSplit", BindingFlags.Public | BindingFlags.Static
+      );
+
+      public static void BeginHorizontalSplit(SplitterState splitterState, GUIStyle style, params GUILayoutOption[] options) {
+        _beginHorizontalSplit.DynamicInvoke(splitterState.InternalState, style, options);
+      }
+
+      public static void BeginVerticalSplit(SplitterState splitterState, GUIStyle style, params GUILayoutOption[] options) {
+        _beginVerticalSplit.DynamicInvoke(splitterState.InternalState, style, options);
+      }
+
+      private static readonly Delegate _beginHorizontalSplit = CreateMethodDelegate(typeof(UnityEditor.Editor).Assembly,
+        "UnityEditor.SplitterGUILayout", "BeginHorizontalSplit", BindingFlags.Public | BindingFlags.Static,
+        typeof(Action<,,>).MakeGenericType(SplitterState.InternalType, typeof(GUIStyle), typeof(GUILayoutOption[]))
+      );
+
+      private static readonly Delegate _beginVerticalSplit = CreateMethodDelegate(typeof(UnityEditor.Editor).Assembly,
+        "UnityEditor.SplitterGUILayout", "BeginVerticalSplit", BindingFlags.Public | BindingFlags.Static,
+        typeof(Action<,,>).MakeGenericType(SplitterState.InternalType, typeof(GUIStyle), typeof(GUILayoutOption[]))
+      );
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.SplitterState.cs
+
+namespace Quantum.Editor {
+  using System;
+  using System.Reflection;
+  using UnityEngine;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [UnityEditor.InitializeOnLoad]
+    [Serializable]
+    public class SplitterState : ISerializationCallbackReceiver {
+
+      public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.SplitterState", true);
+      private static readonly FieldInfo _relativeSizes = InternalType.GetFieldOrThrow("relativeSizes");
+      private static readonly FieldInfo _realSizes = InternalType.GetFieldOrThrow("realSizes");
+      private static readonly FieldInfo _splitSize = InternalType.GetFieldOrThrow("splitSize");
+
+      public string Json = "{}";
+
+      [NonSerialized]
+      public object InternalState = FromRelativeInner(new[] { 1.0f });
+
+      void ISerializationCallbackReceiver.OnAfterDeserialize() {
+        InternalState = JsonUtility.FromJson(Json, InternalType);
+      }
+
+      void ISerializationCallbackReceiver.OnBeforeSerialize() {
+        Json = JsonUtility.ToJson(InternalState);
+      }
+
+      public static SplitterState FromRelative(float[] relativeSizes, int[] minSizes = null, int[] maxSizes = null, int splitSize = 0) {
+        var result = new SplitterState();
+        result.InternalState = FromRelativeInner(relativeSizes, minSizes, maxSizes, splitSize);
+        return result;
+      }
+
+
+      private static object FromRelativeInner(float[] relativeSizes, int[] minSizes = null, int[] maxSizes = null, int splitSize = 0) {
+        return Activator.CreateInstance(InternalType, BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.CreateInstance,
+          null,
+          new object[] { relativeSizes, minSizes, maxSizes, splitSize },
+          null, null);
+      }
+
+      public float[] realSizes => ConvertArray((Array)_realSizes.GetValue(InternalState));
+      public float[] relativeSizes => ConvertArray((Array)_relativeSizes.GetValue(InternalState));
+      public float splitSize => Convert.ToSingle(_splitSize.GetValue(InternalState));
+
+      private static float[] ConvertArray(Array value) {
+        float[] result = new float[value.Length];
+        for (int i = 0; i < value.Length; ++i) {
+          result[i] = Convert.ToSingle(value.GetValue(i));
+        }
+        return result;
+      }
+    }
+  }
+}
+
+#endregion
+
+
+#region UnityInternal.UnityType.cs
+
+namespace Quantum.Editor {
+  using System;
+  using System.Reflection;
+  using UnityEditor;
+  using static ReflectionUtils;
+
+  partial class UnityInternal {
+    [InitializeOnLoad]
+    public class UnityType {
+      public static readonly Type InternalType = typeof(UnityEditor.Editor).Assembly.GetType("UnityEditor.UnityType", true);
+
+      static readonly Delegate FindTypeByNameDelegate = InternalType?.CreateMethodDelegate(nameof(FindTypeByName), BindingFlags.Public | BindingFlags.Static,
+        typeof(Func<,>).MakeGenericType(typeof(string), InternalType)
+      );
+
+      static readonly InstanceAccessor<int> PersistentTypeIDAccessor = InternalType.CreatePropertyAccessor<int>(nameof(persistentTypeID));
+
+      readonly object _instance;
+
+      public UnityType(object instance) {
+        _instance = instance ?? throw new ArgumentNullException(nameof(instance));
+      }
+
+      public static UnityType FindTypeByName(string name) {
+        var instance = FindTypeByNameDelegate.DynamicInvoke(name);
+        return instance == null ? null : new UnityType(instance);
+      }
+
+      public int persistentTypeID => PersistentTypeIDAccessor.GetValue(_instance);
+    }
+  }
+}
+
+#endregion
+
+
 
 #endregion
 

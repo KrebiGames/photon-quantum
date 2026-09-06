@@ -79,7 +79,6 @@ namespace Quantum {
       }
 
       var entries = new System.Collections.Generic.List<Shape2DConfig.CompoundShapeData2D>(colliders.Length);
-      bool allChildren = true;
       bool firstAssigned = false;
       bool layerWarned = false;
       bool triggerWarned = false;
@@ -96,7 +95,6 @@ namespace Quantum {
         }
 
         entries.Add(new Shape2DConfig.CompoundShapeData2D(temp));
-        allChildren &= temp.IsScaledBySourceCollider;
 
         if (!firstAssigned) {
           isTrigger = t;
@@ -114,25 +112,29 @@ namespace Quantum {
       }
 
       if (!firstAssigned) {
+        config.IsScaledBySourceCollider = false;
         return false;
       }
 
       config.ShapeType = Shape2DType.Compound;
       config.IsPersistent = true;
       config.CompoundShapes = entries.ToArray();
-      config.IsScaledBySourceCollider = allChildren;
+      config.IsScaledBySourceCollider = true;
       return true;
     }
 
     public static bool TrySetShapeConfigFromSourceCollider(Shape2DConfig config, Transform reference, Component collider, out bool isTrigger) {
-      if (collider == null) {
+      if (config == null || collider == null) {
+        if (config != null) {
+          config.IsScaledBySourceCollider = false;
+        }
+
         isTrigger = false;
         return false;
       }
 
-      // if the source collider is child (same object, immediate- or deep-child),
-      // pre-scale settings and avoid scaling it twice
-      config.IsScaledBySourceCollider = collider.transform.IsChildOf(reference);
+      // baked in final world scale, in the reference rotation frame; must not be scaled again
+      config.IsScaledBySourceCollider = true;
       var sourceScale = collider.transform.lossyScale;
       var sourceScale2D = collider.transform.lossyScale.ToFPVector2().ToUnityVector2();
 
@@ -140,20 +142,16 @@ namespace Quantum {
 #if QUANTUM_ENABLE_PHYSICS3D && !QUANTUM_DISABLE_PHYSICS3D
         case BoxCollider box:
           config.ShapeType      = Shape2DType.Box;
-          config.BoxExtents     = Vector3.Scale(box.size / 2, sourceScale).ToFPVector2();
-          config.PositionOffset = reference.transform.InverseTransformPoint(box.transform.TransformPoint(box.center)).ToFPVector2();
+          config.BoxExtents     = FPVector2.Abs(Vector3.Scale(box.size / 2, sourceScale).ToFPVector2());
+          config.PositionOffset = GetPositionOffset(reference, box.transform, box.center).ToFPVector2();
           config.RotationOffset = (Quaternion.Inverse(reference.transform.rotation) * box.transform.rotation).ToFPRotation2DDegrees();
           isTrigger             = box.isTrigger;
           break;
 
         case SphereCollider sphere:
           config.ShapeType      = Shape2DType.Circle;
-          if (config.IsScaledBySourceCollider) {
-            config.CircleRadius = ((Math.Max(Math.Abs(sourceScale2D.x), Math.Abs(sourceScale2D.y))) * sphere.radius).ToFP();
-          } else {
-            config.CircleRadius = (Math.Max(Math.Max(Math.Abs(sourceScale.x), Math.Abs(sourceScale.y)), Math.Abs(sourceScale.z)) * sphere.radius).ToFP();
-          }
-          config.PositionOffset = reference.transform.InverseTransformPoint(sphere.transform.TransformPoint(sphere.center)).ToFPVector2();
+          config.CircleRadius   = (Math.Max(Math.Abs(sourceScale2D.x), Math.Abs(sourceScale2D.y)) * sphere.radius).ToFP();
+          config.PositionOffset = GetPositionOffset(reference, sphere.transform, sphere.center).ToFPVector2();
           config.RotationOffset = (Quaternion.Inverse(reference.transform.rotation) * sphere.transform.rotation).ToFPRotation2DDegrees();
           isTrigger             = sphere.isTrigger;
           break;
@@ -186,7 +184,7 @@ namespace Quantum {
             default: throw new ArgumentOutOfRangeException();
           }
 
-          config.PositionOffset = reference.transform.InverseTransformPoint(capsule3D.transform.TransformPoint(capsule3D.center)).ToFPVector2();
+          config.PositionOffset = GetPositionOffset(reference, capsule3D.transform, capsule3D.center).ToFPVector2();
           config.RotationOffset = (Quaternion.Inverse(reference.transform.rotation) * capsule3D.transform.rotation).ToFPRotation2DDegrees();
           isTrigger             = capsule3D.isTrigger;
           break;
@@ -195,8 +193,8 @@ namespace Quantum {
 #if QUANTUM_ENABLE_PHYSICS2D && !QUANTUM_DISABLE_PHYSICS2D
         case BoxCollider2D box:
           config.ShapeType      = Shape2DType.Box;
-          config.BoxExtents     = Vector2.Scale(box.size / 2, sourceScale2D).ToFPVector2();
-          config.PositionOffset = reference.transform.InverseTransformPoint(box.transform.TransformPoint(box.offset.ToFPVector2().ToUnityVector3())).ToFPVector2();
+          config.BoxExtents     = FPVector2.Abs(Vector2.Scale(box.size / 2, sourceScale2D).ToFPVector2());
+          config.PositionOffset = GetPositionOffset(reference, box.transform, box.offset.ToFPVector2().ToUnityVector3()).ToFPVector2();
 
           var refBoxTransform2D = Transform2D.Create(reference.transform.position.ToFPVector2(), reference.transform.rotation.ToFPRotation2D());
           var boxTransform2D    = Transform2D.Create(box.transform.position.ToFPVector2(), box.transform.rotation.ToFPRotation2D());
@@ -207,7 +205,7 @@ namespace Quantum {
         case CircleCollider2D circle:
           config.ShapeType      = Shape2DType.Circle;
           config.CircleRadius   = (Math.Max(Math.Abs(sourceScale2D.x), Math.Abs(sourceScale2D.y)) * circle.radius).ToFP();
-          config.PositionOffset = reference.transform.InverseTransformPoint(circle.transform.TransformPoint(circle.offset.ToFPVector2().ToUnityVector3())).ToFPVector2();
+          config.PositionOffset = GetPositionOffset(reference, circle.transform, circle.offset.ToFPVector2().ToUnityVector3()).ToFPVector2();
 
           var refCircleTransform2D = Transform2D.Create(reference.transform.position.ToFPVector2(), reference.transform.rotation.ToFPRotation2D());
           var circleTransform2D    = Transform2D.Create(circle.transform.position.ToFPVector2(), circle.transform.rotation.ToFPRotation2D());
@@ -227,7 +225,7 @@ namespace Quantum {
           config.CapsuleSize.X = (Math.Abs(sourceScale2D.x) * capsule.size.x).ToFP();
           config.CapsuleSize.Y = (Math.Abs(sourceScale2D.y) * capsule.size.y).ToFP();
           
-          config.PositionOffset = reference.transform.InverseTransformPoint(capsule.transform.TransformPoint(capsule.offset.ToFPVector2().ToUnityVector3())).ToFPVector2();
+          config.PositionOffset = GetPositionOffset(reference, capsule.transform, capsule.offset.ToFPVector2().ToUnityVector3()).ToFPVector2();
           var refCapsuleTransform2D = Transform2D.Create(reference.transform.position.ToFPVector2(), reference.transform.rotation.ToFPRotation2D());
           var capsuleTransform2D    = Transform2D.Create(capsule.transform.position.ToFPVector2(), capsule.transform.rotation.ToFPRotation2D());
           config.RotationOffset = (capsuleTransform2D.Rotation - refCapsuleTransform2D.Rotation) * FP.Rad2Deg;
@@ -249,6 +247,18 @@ namespace Quantum {
 #pragma warning disable CS0162
       return true;
 #pragma warning restore CS0162
+
+      static Vector3 GetPositionOffset(Transform reference, Transform source, Vector3 localCenter) {
+        var worldDelta = source.TransformPoint(localCenter) - reference.position;
+        
+        // a 2D entity only keeps the in-plane part of the reference rotation
+#if QUANTUM_XY
+        var inPlaneRotation = Quaternion.Euler(0, 0, reference.rotation.eulerAngles.z);
+#else
+        var inPlaneRotation = Quaternion.Euler(0, reference.rotation.eulerAngles.y, 0);
+#endif
+        return Quaternion.Inverse(inPlaneRotation) * worldDelta;
+      }
     }
   }
 
@@ -297,7 +307,6 @@ namespace Quantum {
       }
 
       var entries = new System.Collections.Generic.List<Shape3DConfig.CompoundShapeData3D>(colliders.Length);
-      bool allChildren = true;
       bool firstAssigned = false;
       bool layerWarned = false;
       bool triggerWarned = false;
@@ -314,7 +323,6 @@ namespace Quantum {
         }
 
         entries.Add(new Shape3DConfig.CompoundShapeData3D(temp));
-        allChildren &= temp.IsScaledBySourceCollider;
 
         if (!firstAssigned) {
           isTrigger = t;
@@ -333,33 +341,37 @@ namespace Quantum {
       }
 
       if (!firstAssigned) {
+        config.IsScaledBySourceCollider = false;
         return false;
       }
 
       config.ShapeType = Shape3DType.Compound;
       config.IsPersistent = true;
       config.CompoundShapes = entries.ToArray();
-      config.IsScaledBySourceCollider = allChildren;
+      config.IsScaledBySourceCollider = true;
       return true;
     }
 
     public static bool TrySetShapeConfigFromSourceCollider(Shape3DConfig config, Transform reference, Component collider, out bool isTrigger) {
-      if (collider == null) {
+      if (config == null || collider == null) {
+        if (config != null) {
+          config.IsScaledBySourceCollider = false;
+        }
+
         isTrigger = false;
         return false;
       }
 
-      // if the source collider is child (same object, immediate- or deep-child),
-      // pre-scale settings and avoid scaling it twice
-      config.IsScaledBySourceCollider = collider.transform.IsChildOf(reference);
+      // baked in final world scale, in the reference rotation frame; must not be scaled again
+      config.IsScaledBySourceCollider = true;
       Vector3 sourceScale = collider.transform.lossyScale;
 
       switch (collider) {
 #if QUANTUM_ENABLE_PHYSICS3D && !QUANTUM_DISABLE_PHYSICS3D
         case BoxCollider box:
           config.ShapeType      = Shape3DType.Box;
-          config.BoxExtents     = Vector3.Scale(box.size / 2, sourceScale).ToFPVector3();
-          config.PositionOffset = reference.transform.InverseTransformPoint(box.transform.TransformPoint(box.center)).ToFPVector3();
+          config.BoxExtents     = FPVector3.Abs(Vector3.Scale(box.size / 2, sourceScale).ToFPVector3());
+          config.PositionOffset = GetPositionOffset(reference, box.transform, box.center).ToFPVector3();
           config.RotationOffset = (Quaternion.Inverse(reference.transform.rotation) * box.transform.rotation).eulerAngles.ToFPVector3();
           isTrigger             = box.isTrigger;
           break;
@@ -367,7 +379,7 @@ namespace Quantum {
         case SphereCollider sphere:
           config.ShapeType      = Shape3DType.Sphere;
           config.SphereRadius   = (Math.Max(Math.Max(Math.Abs(sourceScale.x), Math.Abs(sourceScale.y)), Math.Abs(sourceScale.z)) * sphere.radius).ToFP();
-          config.PositionOffset = reference.transform.InverseTransformPoint(sphere.transform.TransformPoint(sphere.center)).ToFPVector3();
+          config.PositionOffset = GetPositionOffset(reference, sphere.transform, sphere.center).ToFPVector3();
           config.RotationOffset = (Quaternion.Inverse(reference.transform.rotation) * sphere.transform.rotation).eulerAngles.ToFPVector3();
           isTrigger             = sphere.isTrigger;
           break;
@@ -378,17 +390,17 @@ namespace Quantum {
           switch (capsule.direction) {
             case 0: // x-axis
               config.CapsuleDirection = Quantum.CapsuleDirection3D.X;
-              capsuleRadiusScale *= Math.Max(sourceScale.y, sourceScale.z);
+              capsuleRadiusScale *= Math.Max(Math.Abs(sourceScale.y), Math.Abs(sourceScale.z));
               capsuleHeightScale *= Math.Abs(sourceScale.x);
               break;
             case 1: // y-axis
               config.CapsuleDirection = Quantum.CapsuleDirection3D.Y;
-              capsuleRadiusScale *= Math.Max(sourceScale.x, sourceScale.z);
+              capsuleRadiusScale *= Math.Max(Math.Abs(sourceScale.x), Math.Abs(sourceScale.z));
               capsuleHeightScale *= Math.Abs(sourceScale.y);
               break;
             case 2: // z-axis
               config.CapsuleDirection = Quantum.CapsuleDirection3D.Z;
-              capsuleRadiusScale *= Math.Max(sourceScale.x, sourceScale.y);
+              capsuleRadiusScale *= Math.Max(Math.Abs(sourceScale.x), Math.Abs(sourceScale.y));
               capsuleHeightScale *= Math.Abs(sourceScale.z);
               break;
           }
@@ -396,7 +408,7 @@ namespace Quantum {
           config.ShapeType      = Shape3DType.Capsule;
           config.CapsuleRadius  = Math.Abs(capsuleRadiusScale * capsule.radius).ToFP();
           config.CapsuleHeight  = Math.Abs(capsuleHeightScale * capsule.height).ToFP();
-          config.PositionOffset = reference.transform.InverseTransformPoint(capsule.transform.TransformPoint(capsule.center)).ToFPVector3();
+          config.PositionOffset = GetPositionOffset(reference, capsule.transform, capsule.center).ToFPVector3();
           config.RotationOffset = (Quaternion.Inverse(reference.transform.rotation) * capsule.transform.rotation).eulerAngles.ToFPVector3();
           isTrigger             = capsule.isTrigger;
           break;
@@ -413,6 +425,10 @@ namespace Quantum {
 #pragma warning disable CS0162
       return true;
 #pragma warning restore CS0162
+
+      static Vector3 GetPositionOffset(Transform reference, Transform source, Vector3 localCenter) {
+        return Quaternion.Inverse(reference.rotation) * (source.TransformPoint(localCenter) - reference.position);
+      }
     }
 
     private static string CreateTypeNotSupportedMessage(Type colliderType, params Type[] supportedTypes) {
@@ -5847,11 +5863,11 @@ namespace Quantum {
           position = frame.Unsafe.GetPointer<Transform3D>(entity)->Position.ToUnityVector3();
         }
 
-        var config = frame.FindAsset<NavMeshAgentConfig>(agent.ConfigId);
+        var config = frame.FindAsset(agent.Config);
 
-        if (current == null || current.Identifier.Guid != agent.NavMeshGuid) {
+        if (current == null || current.Identifier.Guid != agent.NavMesh) {
           // cache the asset, it's likely other agents use the same 
-          QuantumUnityDB.TryGetGlobalAsset(agent.NavMeshGuid, out current);
+          QuantumUnityDB.TryGetGlobalAsset(agent.NavMesh, out current);
         }
 
         var agentRadius = GetAgentRadius(current);
@@ -8188,6 +8204,13 @@ namespace Quantum {
     /// Global callback invoked when an asset is being unloaded.
     /// </summary>
     public static Action<Object> AssetUnloaded;
+    
+    // reset static fields to allow to disable domain reload
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStaticFields() {
+      AssetUnloaded        = null;
+      AssetBundleRequested = null;
+    }
 
     internal static object LoadAssetFromBundle<T>(AssetBundle bundle, string assetName, string nestedAssetName, bool synchronous) where T : Object {
       if (synchronous) {
@@ -8679,7 +8702,7 @@ namespace Quantum {
     /// </summary>
     public string ResourcePath { get; }
     /// <summary>
-    /// If loaded in the editor, should the result be instantiated instead of returning the asset itself? The default is <see langword="true"/>. 
+    /// If loaded in the editor, should the result be instantiated instead of returning the asset itself? The default is <see langword="true"/>.
     /// </summary>
     public bool InstantiateIfLoadedInEditor { get; set; } = true;
 
@@ -8688,9 +8711,7 @@ namespace Quantum {
     /// </summary>
     public override QuantumGlobalScriptableObjectLoadResult Load(Type type) {
 
-      var attribute = type.GetCustomAttribute<QuantumGlobalScriptableObjectAttribute>();
-      Assert.Check(attribute != null);
-
+      var attribute = type.GetCustomAttribute<QuantumGlobalScriptableObjectAttribute>() ?? throw new InvalidOperationException($"Missing {nameof(QuantumGlobalScriptableObjectAttribute)} on {type?.FullName}");
       var resourcePath = GetResourcePath(type, attribute);
       if (resourcePath == null) {
         return default;
@@ -8709,8 +8730,7 @@ namespace Quantum {
     /// Loads the asset from Resources asynchronously.
     /// </summary>
     public override System.Threading.Tasks.Task<QuantumGlobalScriptableObjectLoadResult> LoadAsync(Type type) {
-      var attribute = type.GetCustomAttribute<QuantumGlobalScriptableObjectAttribute>();
-      Assert.Check(attribute != null);
+      var attribute = type.GetCustomAttribute<QuantumGlobalScriptableObjectAttribute>() ?? throw new InvalidOperationException($"Missing {nameof(QuantumGlobalScriptableObjectAttribute)} on {type?.FullName}");
 
       var tcs = new TaskCompletionSource<QuantumGlobalScriptableObjectLoadResult>();
 
@@ -9104,7 +9124,7 @@ namespace Quantum {
     /// </summary>
     public virtual float ScrollWidth => 16.0f;
 
-    private StringComparer Comparer => StringComparer.InvariantCulture;
+    private StringComparer Comparer => StringComparer.Ordinal;
 
     /// <summary>
     /// Toggles a windows repaint.
@@ -9649,8 +9669,6 @@ namespace Quantum {
             AllocateMatrix(x1 - x0, y1 - y0);
             FillMatrix(m_c, sx, sy, comparer);
             FillDiff(m_c, sx, sy, comparer, result);
-            var chunks = new List<DiffChunk>();
-            FillDiff(m_c, sx, sy, comparer, chunks);
           }
         }
       }
@@ -20424,7 +20442,7 @@ namespace Quantum {
         FPMathUtils.LoadLookupTables();
       }
 
-      Map asset = data.GetAsset(inEditor);
+      var asset = data.GetAsset(inEditor);
       if (asset == null) {
         if (inEditor) {
           Log.Error($"Failed to bake map {data.name}. Asset {data.AssetRef} not found in QuantumEditorSettings.AssetSearchPaths or DB not ready.");
@@ -24805,6 +24823,8 @@ namespace Quantum {
       RuntimeHost = DeterministicPlatformInfo.RuntimeHosts.Unity,
 #if ENABLE_IL2CPP
       Runtime = DeterministicPlatformInfo.Runtimes.IL2CPP,
+#elif ENABLE_CORECLR
+      Runtime = DeterministicPlatformInfo.Runtimes.NetCore,
 #else
       Runtime = DeterministicPlatformInfo.Runtimes.Mono,
 #endif // ENABLE_IL2CPP
@@ -27563,6 +27583,7 @@ namespace Quantum {
   using System.Collections.Generic;
   using System.Linq;
   using System.Text;
+  using JetBrains.Annotations;
   using UnityEditor;
   using UnityEngine;
   using UnityEngine.Pool;
@@ -27573,7 +27594,7 @@ namespace Quantum {
 #else
   using ObjectIdType = System.Int32;
 #endif
-  
+
   /// <summary>
   /// Extension and utility methods for <see cref="SceneManager"/> and <see cref="Scene"/> types.
   /// </summary>
@@ -27740,7 +27761,7 @@ namespace Quantum {
     /// <summary>
     /// Gets a component on a scene. If there are none or more than one, throws an exception.
     /// </summary>
-    public static T GetSingleComponentOrThrow<T>(this Scene scene, bool includeInactive = false) where T : Component {
+    public static T GetSingleComponentOrThrow<T>(this Scene scene, bool includeInactive = false, Predicate<T> exclude = null) where T : Component {
       using (ListPool<GameObject>.Get(out var roots)) {
         // order does not matter
         scene.GetRootGameObjects(roots);
@@ -27752,7 +27773,9 @@ namespace Quantum {
             continue;
           }
 
-          var component = root.GetComponentInChildren<T>(includeInactive: includeInactive);
+          var component = exclude == null
+            ? root.GetComponentInChildren<T>(includeInactive: includeInactive)
+            : GetComponentInChildrenFiltered<T>(root, includeInactive, exclude);
           if (component) {
             if (result) {
               throw new InvalidOperationException($"Multiple components of type {typeof(T).FullName} found");
@@ -27765,22 +27788,24 @@ namespace Quantum {
         if (result == null) {
           throw new InvalidOperationException($"Components of type {typeof(T).FullName} not found");
         }
-        
+
         return result;
       }
     }
-    
+
     /// <summary>
-    /// Gets all the component present on a scene, depth first.
+    /// Gets first component on a scene.
     /// </summary>
-    public static T GetComponentInHierarchyOrder<T>(this Scene scene, bool includeInactive = false) where T: class{
+    public static T GetComponentInHierarchyOrder<T>(this Scene scene, bool includeInactive = false, Predicate<T> exclude = null) where T: class{
       using (ListPool<GameObject>.Get(out var roots)) {
         scene.GetRootGameObjectsInHierarchyOrder(roots);
         foreach (var root in roots) {
           if (!includeInactive && !root.activeInHierarchy) {
             continue;
           }
-          var result = root.GetComponentInChildren<T>(includeInactive: includeInactive);
+          var result = exclude == null
+            ? root.GetComponentInChildren<T>(includeInactive: includeInactive)
+            : GetComponentInChildrenFiltered<T>(root, includeInactive, exclude);
           if (result != null) {
             return result;
           }
@@ -27789,34 +27814,51 @@ namespace Quantum {
         return null;
       }
     }
-    
+
     /// <summary>
     /// Gets all the component present on a scene, depth first.
     /// </summary>
-    public static T[] GetComponentsInHierarchyOrder<T>(this Scene scene, bool includeInactive = false) where T : class {
+    public static T[] GetComponentsInHierarchyOrder<T>(this Scene scene, bool includeInactive = false, Predicate<T> exclude = null) where T : class {
       using (ListPool<GameObject>.Get(out var roots)) {
         scene.GetRootGameObjectsInHierarchyOrder(roots);
-        return GetComponentsInHierarchyOrder<T>(roots, includeInactive);
+        return GetComponentsInHierarchyOrder<T>(roots, includeInactive, exclude);
       }
     }
-    
+
     /// <summary>
     /// Gets all the component present on a scene, depth first.
     /// </summary>
-    public static T[] GetComponentsInHierarchyOrder<T>(IList<GameObject> roots, bool includeInactive = false) where T : class {
+    public static T[] GetComponentsInHierarchyOrder<T>(IList<GameObject> roots, bool includeInactive = false, Predicate<T> exclude = null) where T : class {
       using (ListPool<T>.Get(out var partialResults))
       using (ListPool<T>.Get(out var fullResults)) {
         foreach (var root in roots) {
           if (!includeInactive && !root.activeInHierarchy) {
             continue;
           }
-          
+
           partialResults.Clear();
           root.GetComponentsInChildren<T>(includeInactive: includeInactive, partialResults);
+          if (exclude != null) {
+            partialResults.RemoveAll(exclude);
+          }
           fullResults.AddRange(partialResults);
         }
 
         return fullResults.ToArray();
+      }
+    }
+    
+    static T GetComponentInChildrenFiltered<T>(GameObject root, bool includeInactive, [NotNull] Predicate<T> exclude) where T : class {
+      using (ListPool<T>.Get(out var components)) {
+        root.GetComponentsInChildren(includeInactive, components);
+        foreach (var component in components) {
+          if (exclude(component)) {
+            continue;
+          }
+          return component;
+        }
+
+        return null;
       }
     }
 

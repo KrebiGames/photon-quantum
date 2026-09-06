@@ -49,6 +49,133 @@ Disclaimer: The Quantum SDK 3.1.0 development snapshots are not intended to be u
 - `QuantumUnityDB` does not throw exceptions in `TryGet*` methods if the DB was failed to be loaded
 - `QuantumCallbackHandler_UnityCallbacks.LoadAddressableScenePathsAsync` is now static
 
+### Build 2200 (Sep 03, 2026)
+
+**What's New**
+
+- `SimulatorContext.MaxPredictedTicks`, a way to clamp the number of predicted frames during simulator callbacks
+- New `SimulatorContext` API: `IsRollbackRequired`, `WillRollbackPrediction`, `HasRolledBackPrediction` and `LatestVerifiedRolledBackTo`. Check the API documentation for further details
+
+**Changes**
+
+- `SimulatorContext.TargetPredictedTick` now sets `MaxPredictedTicks` in order to reach the targeted frame according to current `PredictedFromTick`
+- `SimulatorContext.RollbackPrediction` was replaced by `SkipPredictionRollbackIfPossible`, which has the opposite semantics, defaults to `false` and makes it clearer that the skipping rollback is a request. The old property is obsolete and forwards to the new one
+- `SimulatorContext.TicksToPredict` is now limited by the session rollback window and reports zero while the session is stalling, so the pending tick counts no longer describe work that will not be performed
+
+**Bug Fixes**
+
+- Fixed: An issue that could cause `CallbackSimulationStageFinished` to not be called when the simulation is stalling, even though `CallbackBeforeSimulationStage` is called before predictions
+- Fixed: An issue that could cause the simulator to hang indefinitely when skipping a prediction rollback via `SimulatorContext.RollbackPrediction` in a session Update where the latest Verified state simulated past the previous Update Predicted tick
+
+### Build 2199 (Sep 01, 2026)
+
+**What's New**
+
+- Adding `FrameCopyTime` and `FrameCopies` to simulation stats
+
+**Changes**
+
+- NavMeshPathfinder stores typed asset refs; new Config/NavMesh properties replace obsoleted ConfigId/NavMeshGuid
+- Use var for locals with inferable asset types
+- Removed remaining explicit asset type names where inferable from typed refs
+- Removed redundant type arguments from FindAsset calls with typed asset refs
+- Replaced GetAsset plus null-check patterns with TryGetAsset
+- Added typed GetAsset(AssetRef<T>) resource manager extension and removed now-redundant casts at call sites
+
+### Build 2197 (Aug 29, 2026)
+
+**What's New**
+
+- `QuantumJsonSerializer` `typeResolver` constructor parameter. Allows for custom type resolution in standalone runners
+
+**Improvements**
+
+- Improved component filter/lookup performance
+
+**Changes**
+
+- Reworked (opt-in) copy-on-write mechanics to reduce overhead
+- Improved loading performance of the `FrameDiffer` GUI
+
+**Bug Fixes**
+
+- Fixed: An error that causes a crash when all joints of a joint component are removed during a physics callback
+- Fixed: An error that causes a crash when all joints of a joint component are removed during a physics callback
+- Fixed: An issue where disposing a DynamicMap created with `FromStaticMap` freed 2D polygon buffers still used by the source map
+- Fixed: An issue that caused no map entities to be created when switching to DynamicMap that was cloned from a static Map with map entities
+- Fixed: An internal overflow in 2D and 3D HitCollection sorting that could cause wrong hits to be perceived as the closest one
+- Fixed: `UnityJsonUtilityConvert` no longer throws an exception on deserialization if a `[SerializeReference]` object fails have its type/instance created, but remains unreferenced. This enables Unity-only types and Unity-only fields
+
+### Build 2191 (Aug 26, 2026)
+
+**Bug Fixes**
+
+- Fixed: An issue on 3D Capsule shape prototypes baked from Unity source colliders potentially taking the radius from the wrong axis when the source GameObject had negative scale
+- Fixed: An issue on 2D and 3D Compound shape prototypes having their sub-shapes offset and size scaled incorrectly when the prototype GameObject had negative or non-uniform scale
+- Fixed: An issue on 2D and 3D Box shape prototypes baked from Unity source colliders with negative scale having their extents clamped to zero
+- Fixed: An issue with 2D and 3D Shape prototypes diverging from their Unity source collider when the prototype GameObject is scaled
+
+### Build 2189 (Aug 24, 2026)
+
+**Breaking Changes**
+
+- Frame `DeferredAdd` and `DeferredSet` overloads were removed, as well as `CommitDeferred`. Adding table components to an entity while a filter is iterating that entity's current table no longer throws an exception, so deferring component adds is no longer necessary
+
+**What's New**
+
+- `SimulationConfig.Entities.FrameCopyMode` setting can be used to enable (opt-in) copy-on-write mechanics, replacing a full frame copy before predictions with on-demand block copying on write access
+
+**Changes**
+
+- An Entity that subscribes to collision callbacks from inside a physics callback now starts receiving them on the next tick instead of the same tick
+- Improved `FrameDiffer` load performance
+
+**Bug Fixes**
+
+- Fixed: An issue where the untyped `FrameBase.AddOrGet(EntityRef, int, out void*)` would always add/overwrite
+
+### Build 2185 (Aug 20, 2026)
+
+**Bug Fixes**
+
+- Fixed: An issue that computed the wrong position for the `Hinge Joint` when multiple joints are connected
+
+### Build 2183 (Aug 19, 2026)
+
+**Changes**
+
+- `HitCollection` and `HitCollection3D` now support initial capacity 0
+- Improved the deserialization performance of `QuantumJsonSerializer`
+- Physics `Hit Collection Items` capacity is now clamped to a minimum of 4, and allocating a hit collection with a non-positive capacity throws an `ArgumentOutOfRangeException`
+- Physics broad-phase queries added after the start of the Physics system now no longer produce a valid `PhysicsQueryRef` and are effectively a no-op
+- Updated Photon Realtime to version `5.1.18`
+
+**Bug Fixes**
+
+- Fixed: An issue that prevented a body from sleeping when it touched sleeping bodies or was connected to them by joints, when the contact generated no force, such as a box spawned next to a stack
+- Fixed: An issue that caused bodies connected by joints to move even when they were sleeping
+- Fixed: `HitCollection` and `HitCollection3D` causing Memory Integrity Check failure in 32-bit platforms
+- Fixed: An issue with 2D and 3D broad-phase shape overlap and shape cast queries with a Compound shape that could cause released native memory to be accessed
+- Fixed: An issue in 3D physics that could cause a crash or bogus hits when a mutable mesh collider was disabled or removed during a physics callback and injected broad-phase queries were checking that same mesh
+- Fixed: An issue that could cause memory corruption when adding broad-phase queries during the physics update (e.g. from collision callbacks)
+
+### Build 2181 (Aug 18, 2026)
+
+**Bug Fixes**
+
+- Fixed: An issue that caused some of the `QuantumDotnetBuildSettings` buttons to not work with new solution extension `slnx` very well
+
+### Build 2180 (Aug 15, 2026)
+
+**What's New**
+
+- Allow overriding the properties of the limbs, head, chest, and hips that are baked and managed by the QuantumRagdoll to create asymmetric ragdolls
+- Gizmo handles for editing the `QuantumRagdoll` and allowing it to automatically bake the ragdoll fields using an `Animator` component reference
+
+**Changes**
+
+- Updated Photon Realtime to version `5.1.18`
+
 ### Build 2176 (Aug 13, 2026)
 
 **What's New**
